@@ -1,0 +1,23 @@
+# Binaries
+bundler
+keygen
+*.exe
+
+# Test
+*.test
+coverage.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Bundler runtime (never commit)
+keystore.json
+bundler.db
+bundler.db-wal
+bundler.db-shm
