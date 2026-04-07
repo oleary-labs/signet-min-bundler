@@ -1,6 +1,6 @@
-# Binaries
-bundler
-keygen
+# Binaries (built in repo root)
+/bundler
+/keygen
 *.exe
 
 # Test
