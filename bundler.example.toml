@@ -1,0 +1,42 @@
+# bundler.example.toml — copy to bundler.toml and fill in values.
+
+# ── Network ───────────────────────────────────────────────────────────────
+rpcUrl  = "https://mainnet.infura.io/v3/YOUR_KEY"
+chainId = 1
+
+# ── Protocol ──────────────────────────────────────────────────────────────
+entryPoints = [
+  "0x0000000071727De22E5E9d8BAf0edAc6f37da032",  # EntryPoint v0.7
+]
+
+# ── Policy ────────────────────────────────────────────────────────────────
+# Contract addresses that ops are allowed to call via execute().
+# Self-calls (target == sender) are always permitted.
+allowedTargets = [
+  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
+  "0xdAC17F958D2ee523a2206206994597C13D831ec7",  # USDT
+]
+
+# Empty list = only ops with no paymaster are accepted.
+# Listed addresses = those paymasters are accepted when present.
+allowedPaymasters = []
+
+# ── Gas bounds (sanity caps, not simulation) ──────────────────────────────
+maxVerificationGas = 50_000
+maxCallGas         = 500_000
+maxBundleSize      = 10
+
+# ── Mempool lifecycle ─────────────────────────────────────────────────────
+pendingTtlMs = 1_800_000     # 30 minutes
+retentionMs  = 604_800_000   # 7 days
+
+# ── Hot key ───────────────────────────────────────────────────────────────
+keystorePath    = "~/.bundler/keystore.json"
+# expectedAddress = "0x..."  # optional; verified on startup
+
+# ── Storage ───────────────────────────────────────────────────────────────
+dbPath = "~/.bundler/bundler.db"
+
+# ── Server ────────────────────────────────────────────────────────────────
+listenAddr     = ":4337"
+tickIntervalMs = 12_000       # 12 seconds (one Ethereum block)
