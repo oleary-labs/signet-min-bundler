@@ -21,3 +21,5 @@ keystore.json
 bundler.db
 bundler.db-wal
 bundler.db-shm
+
+bundler.toml

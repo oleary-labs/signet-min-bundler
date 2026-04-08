@@ -133,6 +133,7 @@ func run(configPath string) error {
 	rpcServer := rpc.NewServer(methods, log.With(zap.String("component", "rpc")))
 
 	tickInterval := time.Duration(cfg.TickIntervalMs) * time.Millisecond
+	// TODO: does this only really support one entry point?
 	bundleLoop := bundler.NewLoop(
 		repo, bSigner, client,
 		cfg.EntryPoints[0],
