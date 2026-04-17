@@ -9,10 +9,14 @@ import (
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
 )
 
-// VerificationGasLimit is derived analytically from the Signet wallet architecture.
-// See design spec §11.2 for the component breakdown.
-// Must be validated empirically against a test fork before production.
-const VerificationGasLimit = 31_000
+// VerificationGasLimit covers validateUserOp for already-deployed wallets.
+// FROSTVerifier.verify uses modexp + ecrecover + SHA-256, which costs 50-100k gas.
+const VerificationGasLimit = 150_000
+
+// VerificationGasLimitCreate covers factory deployment + validateUserOp for
+// first-time UserOps that include initCode. High because SignetAccount embeds
+// the full FROSTVerifier logic inline, making the CREATE2 deploy expensive.
+const VerificationGasLimitCreate = 1_000_000
 
 // GasEstimate holds the three gas values returned by eth_estimateUserOperationGas.
 type GasEstimate struct {
@@ -45,9 +49,14 @@ func (e *Estimator) Estimate(ctx context.Context, op *core.PackedUserOp) (*GasEs
 		return nil, fmt.Errorf("estimateCallGas: %w", err)
 	}
 
+	verifGas := int64(VerificationGasLimit)
+	if len(op.InitCode) > 0 {
+		verifGas = VerificationGasLimitCreate
+	}
+
 	return &GasEstimate{
 		PreVerificationGas:   pvg,
-		VerificationGasLimit: big.NewInt(VerificationGasLimit),
+		VerificationGasLimit: big.NewInt(verifGas),
 		CallGasLimit:         callGas,
 	}, nil
 }

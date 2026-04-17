@@ -185,7 +185,9 @@ func run(configPath string) error {
 func buildLogger() (*zap.Logger, error) {
 	dev := os.Getenv("BUNDLER_DEV") == "1"
 	if dev {
-		return zap.NewDevelopment()
+		cfg := zap.NewDevelopmentConfig()
+		// Only show stack traces on DPanic+, not every Warn/Error.
+		return cfg.Build(zap.AddStacktrace(zapcore.DPanicLevel))
 	}
 
 	cfg := zap.NewProductionConfig()

@@ -2,6 +2,8 @@ package bundler
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
 	"github.com/oleary-labs/signet-min-bundler/internal/mempool"
 	"go.uber.org/zap"
@@ -20,6 +23,7 @@ var handleOpsSelector = core.Keccak256([]byte("handleOps((address,uint256,bytes,
 // BundleClient is the subset of ethclient.Client needed by the bundling loop.
 type BundleClient interface {
 	EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error)
+	CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 }
 
@@ -72,7 +76,7 @@ func (l *BundlingLoop) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := l.Tick(ctx); err != nil {
-				l.log.Error("bundling tick failed", zap.Error(err))
+				l.log.Error("bundling tick failed", zap.String("error", err.Error()))
 			}
 		}
 	}
@@ -104,17 +108,35 @@ func (l *BundlingLoop) Tick(ctx context.Context) error {
 	}
 
 	// 4. Build handleOps calldata.
+	opHashes := make([]string, len(ops))
+	for i, op := range ops {
+		opHashes[i] = op.Hash.Hex()[:10]
+	}
+	l.log.Debug("building bundle",
+		zap.Strings("ops", opHashes),
+		zap.Int("count", len(ops)))
+
 	calldata := BuildHandleOpsCalldata(ops, l.signer.Address())
 
 	// 5. Estimate gas for the bundle tx.
-	gasLimit, err := l.client.EstimateGas(ctx, ethereum.CallMsg{
-		From: l.signer.Address(), // fix R4
+	callMsg := ethereum.CallMsg{
+		From: l.signer.Address(),
 		To:   &l.entryPoint,
 		Data: calldata,
-	})
+	}
+	gasLimit, err := l.client.EstimateGas(ctx, callMsg)
 	if err != nil {
 		// Fix R5: reset ops to pending on submission failure.
 		l.resetToPending(ops, "estimate gas failed")
+
+		// Log calldata so it can be debugged with cast:
+		//   cast call <entrypoint> <calldata> --from <bundler> --rpc-url http://localhost:8545 --trace
+		l.log.Error("handleOps failed, debug with cast call",
+			zap.String("entrypoint", l.entryPoint.Hex()),
+			zap.String("from", l.signer.Address().Hex()),
+			zap.String("calldata", "0x"+hex.EncodeToString(calldata)))
+		l.logRevertReason(ctx, callMsg)
+
 		return fmt.Errorf("estimate gas: %w", err)
 	}
 	gasLimit = gasLimit * 12 / 10 // 20% buffer
@@ -157,6 +179,24 @@ func (l *BundlingLoop) resetToPending(ops []*mempool.StoredOp, reason string) {
 	l.log.Warn("reset ops to pending after failure",
 		zap.String("reason", reason),
 		zap.Int("count", len(ops)))
+}
+
+// logRevertReason does an eth_call to capture the revert reason from a failed
+// handleOps and logs it. Best-effort — errors are swallowed.
+func (l *BundlingLoop) logRevertReason(ctx context.Context, msg ethereum.CallMsg) {
+	_, err := l.client.CallContract(ctx, msg, nil)
+	if err == nil {
+		return
+	}
+	// go-ethereum wraps revert data in rpc.DataError.
+	var dataErr rpc.DataError
+	if errors.As(err, &dataErr) {
+		if revertHex, ok := dataErr.ErrorData().(string); ok && revertHex != "0x" {
+			l.log.Error("handleOps revert data", zap.String("data", revertHex))
+			return
+		}
+	}
+	l.log.Error("handleOps reverted", zap.String("error", err.Error()))
 }
 
 // BuildHandleOpsCalldata ABI-encodes handleOps(PackedUserOperation[], address beneficiary).

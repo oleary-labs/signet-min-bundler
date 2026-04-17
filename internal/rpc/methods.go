@@ -63,6 +63,8 @@ func (m *Methods) handleSendUserOperation(params []json.RawMessage) (any, *RpcEr
 	// 1. Validate entry point.
 	entryPoint := common.HexToAddress(entryPointHex)
 	if !m.isAllowedEntryPoint(entryPoint) {
+		m.log.Warn("op rejected: unsupported entry point",
+			zap.String("entry_point", entryPoint.Hex()))
 		return nil, ErrOpRejected("unsupported entry point")
 	}
 
@@ -74,11 +76,17 @@ func (m *Methods) handleSendUserOperation(params []json.RawMessage) (any, *RpcEr
 
 	// 3. Validate signature length.
 	if len(packed.Signature) != 65 {
+		m.log.Warn("op rejected: bad signature length",
+			zap.String("sender", packed.Sender.Hex()),
+			zap.Int("sig_len", len(packed.Signature)))
 		return nil, ErrOpRejected("signature must be 65 bytes")
 	}
 
 	// 4. Allowlist validation.
 	if err := m.validator.Validate(packed); err != nil {
+		m.log.Warn("op rejected",
+			zap.String("sender", packed.Sender.Hex()),
+			zap.String("reason", err.Error()))
 		return nil, ErrOpRejected(err.Error())
 	}
 

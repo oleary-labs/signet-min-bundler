@@ -52,6 +52,12 @@ func (c *mockBundleClient) EstimateGas(ctx context.Context, msg ethereum.CallMsg
 	}
 	return c.gasEstimate, nil
 }
+func (c *mockBundleClient) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	if c.failGas {
+		return nil, fmt.Errorf("execution reverted")
+	}
+	return nil, nil
+}
 func (c *mockBundleClient) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	if r, ok := c.receipts[txHash]; ok {
 		return r, nil

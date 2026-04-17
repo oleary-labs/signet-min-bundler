@@ -37,23 +37,29 @@ func run(outPath string) error {
 	}
 	address := crypto.PubkeyToAddress(privateKey.PublicKey)
 
-	// Prompt for password.
-	fmt.Fprint(os.Stderr, "Set keystore password: ")
-	pass1, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Fprintln(os.Stderr)
-	if err != nil {
-		return fmt.Errorf("read password: %w", err)
-	}
+	// Get password from env var (non-interactive) or prompt.
+	var pass1 []byte
+	if envPass := os.Getenv("BUNDLER_KEYSTORE_PASSWORD"); envPass != "" {
+		pass1 = []byte(envPass)
+	} else {
+		fmt.Fprint(os.Stderr, "Set keystore password: ")
+		p1, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return fmt.Errorf("read password: %w", err)
+		}
 
-	fmt.Fprint(os.Stderr, "Confirm password:      ")
-	pass2, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Fprintln(os.Stderr)
-	if err != nil {
-		return fmt.Errorf("read password: %w", err)
-	}
+		fmt.Fprint(os.Stderr, "Confirm password:      ")
+		pass2, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return fmt.Errorf("read password: %w", err)
+		}
 
-	if string(pass1) != string(pass2) {
-		return fmt.Errorf("passwords do not match")
+		if string(p1) != string(pass2) {
+			return fmt.Errorf("passwords do not match")
+		}
+		pass1 = p1
 	}
 	if len(pass1) == 0 {
 		return fmt.Errorf("password cannot be empty")

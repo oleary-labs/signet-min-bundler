@@ -23,3 +23,7 @@ bundler.db-wal
 bundler.db-shm
 
 bundler.toml
+
+# Devnet local state
+.devnet/
+bin/
