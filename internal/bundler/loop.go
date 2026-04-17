@@ -3,15 +3,14 @@ package bundler
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"strings"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
 	"github.com/oleary-labs/signet-min-bundler/internal/mempool"
 	"go.uber.org/zap"
@@ -126,16 +125,26 @@ func (l *BundlingLoop) Tick(ctx context.Context) error {
 	}
 	gasLimit, err := l.client.EstimateGas(ctx, callMsg)
 	if err != nil {
-		// Fix R5: reset ops to pending on submission failure.
-		l.resetToPending(ops, "estimate gas failed")
+		revertReason := l.extractRevertReason(ctx, callMsg)
 
-		// Log calldata so it can be debugged with cast:
+		if isEntryPointRevert(err, revertReason) {
+			// EntryPoint FailedOp errors (AA13, AA21, AA24, etc.) are permanent —
+			// the op is structurally invalid and retrying won't help.
+			l.failOps(ops, revertReason)
+			l.log.Error("ops failed permanently",
+				zap.String("reason", revertReason),
+				zap.Int("count", len(ops)))
+		} else {
+			// Network errors, RPC timeouts, etc. are transient — retry later.
+			l.resetToPending(ops, "estimate gas failed")
+		}
+
+		// Log calldata for debugging with cast:
 		//   cast call <entrypoint> <calldata> --from <bundler> --rpc-url http://localhost:8545 --trace
 		l.log.Error("handleOps failed, debug with cast call",
 			zap.String("entrypoint", l.entryPoint.Hex()),
 			zap.String("from", l.signer.Address().Hex()),
 			zap.String("calldata", "0x"+hex.EncodeToString(calldata)))
-		l.logRevertReason(ctx, callMsg)
 
 		return fmt.Errorf("estimate gas: %w", err)
 	}
@@ -181,22 +190,52 @@ func (l *BundlingLoop) resetToPending(ops []*mempool.StoredOp, reason string) {
 		zap.Int("count", len(ops)))
 }
 
-// logRevertReason does an eth_call to capture the revert reason from a failed
-// handleOps and logs it. Best-effort — errors are swallowed.
-func (l *BundlingLoop) logRevertReason(ctx context.Context, msg ethereum.CallMsg) {
-	_, err := l.client.CallContract(ctx, msg, nil)
-	if err == nil {
-		return
-	}
-	// go-ethereum wraps revert data in rpc.DataError.
-	var dataErr rpc.DataError
-	if errors.As(err, &dataErr) {
-		if revertHex, ok := dataErr.ErrorData().(string); ok && revertHex != "0x" {
-			l.log.Error("handleOps revert data", zap.String("data", revertHex))
-			return
+// failOps marks all ops as permanently failed with the given reason.
+func (l *BundlingLoop) failOps(ops []*mempool.StoredOp, reason string) {
+	for _, op := range ops {
+		if err := l.repo.UpdateStatus(op.Hash, mempool.StatusFailed, &mempool.StatusExtra{
+			RevertReason: &reason,
+		}); err != nil {
+			l.log.Error("failed to mark op as failed",
+				zap.String("hash", op.Hash.Hex()),
+				zap.Error(err))
 		}
 	}
-	l.log.Error("handleOps reverted", zap.String("error", err.Error()))
+}
+
+// extractRevertReason does an eth_call to get the revert reason string.
+// Returns the error message from the revert, or a generic message if extraction fails.
+func (l *BundlingLoop) extractRevertReason(ctx context.Context, msg ethereum.CallMsg) string {
+	_, err := l.client.CallContract(ctx, msg, nil)
+	if err == nil {
+		return "unknown"
+	}
+	return err.Error()
+}
+
+// isEntryPointRevert returns true if the error indicates a permanent EntryPoint
+// rejection (FailedOp, FailedOpWithRevert) rather than a transient failure.
+func isEntryPointRevert(estimateErr error, revertReason string) bool {
+	// EntryPoint FailedOp errors contain "AA" error codes (AA10-AA41).
+	// These are permanent: the op itself is invalid.
+	if strings.Contains(revertReason, "FailedOp") ||
+		strings.Contains(revertReason, "FailedOpWithRevert") {
+		return true
+	}
+
+	// go-ethereum surfaces the custom error selector in "execution reverted: custom error 0x..."
+	// FailedOp = 0x220266b6, FailedOpWithRevert = 0x6fde1f52
+	msg := estimateErr.Error()
+	if strings.Contains(msg, "0x220266b6") || strings.Contains(msg, "0x6fde1f52") {
+		return true
+	}
+
+	// "AA" prefixed reasons from decoded revert data.
+	if strings.Contains(revertReason, " AA") {
+		return true
+	}
+
+	return false
 }
 
 // BuildHandleOpsCalldata ABI-encodes handleOps(PackedUserOperation[], address beneficiary).
