@@ -126,9 +126,29 @@ else
     ok "Already funded ($(cast from-wei "$BALANCE") ETH)"
 fi
 
-# ── VerifyingPaymaster ───────────────────────────────────────────────────
+# ── SignetPaymaster ──────────────────────────────────────────────────────
+#
+# Note: this used to deploy the stock VerifyingPaymaster, but the bundler's
+# paymaster service (internal/paymaster/paymaster.go) calls shouldSponsor()
+# during ERC-7677 pm_getPaymasterData, and the stock contract doesn't have
+# that function. SignetPaymaster wraps VerifyingPaymaster's signature logic
+# and adds shouldSponsor() + target allowlisting tied to the factory.
 
-info "Deploying VerifyingPaymaster"
+info "Deploying SignetPaymaster"
+
+# SignetPaymaster needs the signet-protocol SignetFactory address as its
+# third constructor arg so shouldSponsor() can call factory.isGroup(target).
+# Read it from the sibling repo's devnet env file.
+SIGNET_PROTOCOL_ENV="${SIGNET_PROTOCOL_ENV:-../signet-protocol/devnet/.env}"
+if [ ! -f "$SIGNET_PROTOCOL_ENV" ]; then
+    die "signet-protocol devnet env not found at $SIGNET_PROTOCOL_ENV. Run devnet/start.sh in signet-protocol first, or set SIGNET_PROTOCOL_ENV=<path>."
+fi
+# shellcheck disable=SC1090
+. "$SIGNET_PROTOCOL_ENV"
+if [ -z "${FACTORY_ADDRESS:-}" ]; then
+    die "FACTORY_ADDRESS not found in $SIGNET_PROTOCOL_ENV"
+fi
+ok "Using SignetFactory at $FACTORY_ADDRESS"
 
 PAYMASTER_ADDR_FILE="${DEVNET_DIR}/paymaster.addr"
 PAYMASTER_ADDR=""
@@ -144,23 +164,37 @@ if [ -f "$PAYMASTER_ADDR_FILE" ]; then
 fi
 
 if [ -z "$PAYMASTER_ADDR" ]; then
-    # Build the VerifyingPaymaster contract.
+    # Build the contracts.
     info "Compiling contracts"
     forge build --root contracts --silent 2>&1
 
-    # Deploy with bundler address as the verifying signer.
-    # Constructor: VerifyingPaymaster(IEntryPoint, address verifyingSigner)
+    # Deploy with bundler address as the verifying signer and the
+    # signet-protocol factory as the allowlist source.
+    # Constructor: SignetPaymaster(IEntryPoint, address verifyingSigner, ISignetFactory)
+    #
+    # Foundry 1.5.x footguns (all three bite this one call):
+    #   1. --broadcast is now required; without it forge create is a dry-run
+    #      and returns no `deployedTo` field, so the python parse below fails.
+    #   2. --constructor-args is variadic and greedily consumes everything
+    #      after it — including --private-key, --rpc-url, etc. It MUST be the
+    #      last flag on the command line.
+    #   3. With --root contracts, paths resolve relative to contracts/. The
+    #      SignetPaymaster source lives at contracts/src/, referenced as
+    #      src/... from that root.
+    #
+    # If this call fails, drop the `2>/dev/null` to see forge's real error.
     DEPLOY_OUTPUT=$(forge create \
-        lib/account-abstraction/contracts/samples/VerifyingPaymaster.sol:VerifyingPaymaster \
-        --constructor-args "$ENTRYPOINT_V07" "$BUNDLER_ADDR" \
-        --private-key "$ANVIL_FUNDER_KEY" \
         --rpc-url "$ANVIL_RPC" \
         --root contracts \
-        --json 2>/dev/null)
+        --broadcast \
+        --private-key "$ANVIL_FUNDER_KEY" \
+        --json \
+        src/SignetPaymaster.sol:SignetPaymaster \
+        --constructor-args "$ENTRYPOINT_V07" "$BUNDLER_ADDR" "$FACTORY_ADDRESS" 2>/dev/null)
 
     PAYMASTER_ADDR=$(echo "$DEPLOY_OUTPUT" | python3 -c "import sys,json; print(json.load(sys.stdin)['deployedTo'])")
     if [ -z "$PAYMASTER_ADDR" ] || [ "$PAYMASTER_ADDR" = "None" ]; then
-        die "Failed to deploy VerifyingPaymaster"
+        die "Failed to deploy SignetPaymaster"
     fi
 
     echo "$PAYMASTER_ADDR" > "$PAYMASTER_ADDR_FILE"

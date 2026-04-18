@@ -29,5 +29,8 @@ bundler.toml
 bin/
 
 # Forge build artifacts
+out/
+cache/
 contracts/out/
 contracts/cache/
+contracts/foundry.lock
