@@ -1,0 +1,14 @@
+{
+  "lib/account-abstraction": {
+    "tag": {
+      "name": "v0.7.0",
+      "rev": "7af70c8993a6f42973f520ae0752386a5032abe7"
+    }
+  },
+  "lib/openzeppelin-contracts": {
+    "tag": {
+      "name": "v5.0.1",
+      "rev": "01ef448981be9d20ca85f2faf6ebdf591ce409f3"
+    }
+  }
+}

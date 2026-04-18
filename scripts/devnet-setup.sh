@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # devnet-setup.sh — bootstrap a local bundler against Anvil at localhost:8545.
 #
-# Prerequisites: anvil running, cast (Foundry) on PATH.
+# Prerequisites: anvil running, cast + forge (Foundry) on PATH.
 # Idempotent: safe to re-run.
 
 set -euo pipefail
@@ -36,6 +36,7 @@ require_cmd() {
 info "Checking prerequisites"
 
 require_cmd cast
+require_cmd forge
 require_cmd go
 
 # Check Anvil is reachable.
@@ -125,6 +126,57 @@ else
     ok "Already funded ($(cast from-wei "$BALANCE") ETH)"
 fi
 
+# ── VerifyingPaymaster ───────────────────────────────────────────────────
+
+info "Deploying VerifyingPaymaster"
+
+PAYMASTER_ADDR_FILE="${DEVNET_DIR}/paymaster.addr"
+PAYMASTER_ADDR=""
+
+# Check if we have a stored paymaster address that still has code.
+if [ -f "$PAYMASTER_ADDR_FILE" ]; then
+    STORED_PM=$(cat "$PAYMASTER_ADDR_FILE")
+    PM_CODE=$(cast code "$STORED_PM" --rpc-url "$ANVIL_RPC" 2>/dev/null || echo "0x")
+    if [ "$PM_CODE" != "0x" ] && [ -n "$PM_CODE" ]; then
+        PAYMASTER_ADDR="$STORED_PM"
+        ok "Paymaster already deployed at $PAYMASTER_ADDR"
+    fi
+fi
+
+if [ -z "$PAYMASTER_ADDR" ]; then
+    # Build the VerifyingPaymaster contract.
+    info "Compiling contracts"
+    forge build --root contracts --silent 2>&1
+
+    # Deploy with bundler address as the verifying signer.
+    # Constructor: VerifyingPaymaster(IEntryPoint, address verifyingSigner)
+    DEPLOY_OUTPUT=$(forge create \
+        lib/account-abstraction/contracts/samples/VerifyingPaymaster.sol:VerifyingPaymaster \
+        --constructor-args "$ENTRYPOINT_V07" "$BUNDLER_ADDR" \
+        --private-key "$ANVIL_FUNDER_KEY" \
+        --rpc-url "$ANVIL_RPC" \
+        --root contracts \
+        --json 2>/dev/null)
+
+    PAYMASTER_ADDR=$(echo "$DEPLOY_OUTPUT" | python3 -c "import sys,json; print(json.load(sys.stdin)['deployedTo'])")
+    if [ -z "$PAYMASTER_ADDR" ] || [ "$PAYMASTER_ADDR" = "None" ]; then
+        die "Failed to deploy VerifyingPaymaster"
+    fi
+
+    echo "$PAYMASTER_ADDR" > "$PAYMASTER_ADDR_FILE"
+    ok "Paymaster deployed at $PAYMASTER_ADDR"
+
+    # Transfer ownership to the funder (BasePaymaster.transferOwnership).
+    # The deployer is already the owner, so this is a no-op, but keeps it explicit.
+
+    # Deposit ETH into EntryPoint for the paymaster to cover gas.
+    cast send "$ENTRYPOINT_V07" "depositTo(address)" "$PAYMASTER_ADDR" \
+        --value 100ether \
+        --from "$ANVIL_FUNDER" --private-key "$ANVIL_FUNDER_KEY" \
+        --rpc-url "$ANVIL_RPC" >/dev/null
+    ok "Deposited 100 ETH for paymaster on EntryPoint"
+fi
+
 # ── Write devnet config ─────────────────────────────────────────────────
 
 info "Writing devnet config"
@@ -136,9 +188,9 @@ chainId = $ANVIL_CHAIN_ID
 
 entryPoints = ["$ENTRYPOINT_V07"]
 
-# Signet group factory on local Anvil.
-allowedTargets    = ["0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"]
-allowedPaymasters = []
+# VerifyingPaymaster deployed by devnet-setup.sh.
+# Bundler key is the verifying signer — signs all sponsorship requests.
+allowedPaymasters = ["$PAYMASTER_ADDR"]
 
 maxVerificationGas = 1000000
 maxCallGas         = 5000000
@@ -169,4 +221,5 @@ echo "    make devnet"
 echo ""
 echo "  RPC endpoint:  http://localhost:4337"
 echo "  Bundler addr:  $BUNDLER_ADDR"
+echo "  Paymaster:     $PAYMASTER_ADDR"
 echo ""

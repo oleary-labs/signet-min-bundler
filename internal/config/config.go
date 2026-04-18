@@ -14,7 +14,6 @@ type BundlerConfig struct {
 	RpcURL             string           `toml:"rpcUrl"`
 	ChainID            uint64           `toml:"chainId"`
 	EntryPoints        []common.Address `toml:"entryPoints"`
-	AllowedTargets     []common.Address `toml:"allowedTargets"`
 	AllowedPaymasters  []common.Address `toml:"allowedPaymasters"`
 	MaxVerificationGas uint64           `toml:"maxVerificationGas"`
 	MaxCallGas         uint64           `toml:"maxCallGas"`
@@ -82,6 +81,9 @@ func (c *BundlerConfig) validate() error {
 	}
 	if len(c.EntryPoints) == 0 {
 		return fmt.Errorf("at least one entryPoint is required")
+	}
+	if len(c.AllowedPaymasters) == 0 {
+		return fmt.Errorf("at least one allowedPaymaster is required")
 	}
 	if c.MaxVerificationGas == 0 {
 		return fmt.Errorf("maxVerificationGas is required")

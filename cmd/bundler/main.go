@@ -30,6 +30,7 @@ import (
 	"github.com/oleary-labs/signet-min-bundler/internal/config"
 	"github.com/oleary-labs/signet-min-bundler/internal/estimator"
 	"github.com/oleary-labs/signet-min-bundler/internal/mempool"
+	"github.com/oleary-labs/signet-min-bundler/internal/paymaster"
 	"github.com/oleary-labs/signet-min-bundler/internal/rpc"
 	"github.com/oleary-labs/signet-min-bundler/internal/signer"
 	"github.com/oleary-labs/signet-min-bundler/internal/validator"
@@ -114,7 +115,6 @@ func run(configPath string) error {
 
 	// 9. Build components.
 	v := validator.New(
-		cfg.AllowedTargets,
 		cfg.AllowedPaymasters,
 		cfg.MaxVerificationGas,
 		cfg.MaxCallGas,
@@ -122,12 +122,14 @@ func run(configPath string) error {
 
 	est := estimator.New(client)
 
+	pm := paymaster.New(bSigner, cfg.AllowedPaymasters[0], cfg.ChainID)
+
 	methods := rpc.NewMethods(
 		rpc.MethodsConfig{
 			EntryPoints: cfg.EntryPoints,
 			ChainID:     cfg.ChainID,
 		},
-		v, repo, est,
+		v, repo, est, pm,
 		log.With(zap.String("component", "rpc")),
 	)
 	rpcServer := rpc.NewServer(methods, log.With(zap.String("component", "rpc")))

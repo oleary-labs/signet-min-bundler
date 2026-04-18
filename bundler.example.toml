@@ -10,16 +10,11 @@ entryPoints = [
 ]
 
 # ── Policy ────────────────────────────────────────────────────────────────
-# Contract addresses that ops are allowed to call via execute().
-# Self-calls (target == sender) are always permitted.
-allowedTargets = [
-  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",  # USDC
-  "0xdAC17F958D2ee523a2206206994597C13D831ec7",  # USDT
+# All ops must have an approved paymaster. The paymaster's on-chain logic
+# enforces app-specific policy (target validation, rate limiting, etc.).
+allowedPaymasters = [
+  "0xYourPaymasterAddress",
 ]
-
-# Empty list = only ops with no paymaster are accepted.
-# Listed addresses = those paymasters are accepted when present.
-allowedPaymasters = []
 
 # ── Gas bounds (sanity caps, not simulation) ──────────────────────────────
 maxVerificationGas = 50_000

@@ -27,3 +27,7 @@ bundler.toml
 # Devnet local state
 .devnet/
 bin/
+
+# Forge build artifacts
+contracts/out/
+contracts/cache/

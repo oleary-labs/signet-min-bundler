@@ -15,20 +15,31 @@ import (
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
 	"github.com/oleary-labs/signet-min-bundler/internal/estimator"
 	"github.com/oleary-labs/signet-min-bundler/internal/mempool"
+	"github.com/oleary-labs/signet-min-bundler/internal/paymaster"
 	"github.com/oleary-labs/signet-min-bundler/internal/validator"
 	"go.uber.org/zap"
 )
 
 var (
 	testEntryPoint = common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032")
-	testUSDC       = common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	testSender     = common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	testPaymaster  = common.HexToAddress("0x1111111111111111111111111111111111111111")
 )
 
 type mockEstClient struct{}
 
 func (c *mockEstClient) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
 	return 50_000, nil
+}
+
+type mockPaymasterSigner struct{}
+
+func (s *mockPaymasterSigner) Address() common.Address {
+	return common.HexToAddress("0x2222222222222222222222222222222222222222")
+}
+
+func (s *mockPaymasterSigner) SignHash(hash []byte) ([]byte, error) {
+	return make([]byte, 65), nil
 }
 
 func setupServer(t *testing.T) (*Server, mempool.Repository) {
@@ -41,20 +52,20 @@ func setupServer(t *testing.T) (*Server, mempool.Repository) {
 	t.Cleanup(func() { repo.Close() })
 
 	v := validator.New(
-		[]common.Address{testUSDC},
-		nil,
+		[]common.Address{testPaymaster},
 		50_000,
 		500_000,
 	)
 
 	est := estimator.New(&mockEstClient{})
+	pm := paymaster.New(&mockPaymasterSigner{}, testPaymaster, 1)
 
 	methods := NewMethods(
 		MethodsConfig{
 			EntryPoints: []common.Address{testEntryPoint},
 			ChainID:     1,
 		},
-		v, repo, est, zap.NewNop(),
+		v, repo, est, pm, zap.NewNop(),
 	)
 
 	return NewServer(methods, zap.NewNop()), repo
@@ -89,7 +100,7 @@ func rpcCall(t *testing.T, srv *Server, method string, params ...any) jsonrpcRes
 }
 
 func validUserOp() map[string]any {
-	target := testUSDC
+	target := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	calldata := core.BuildExecuteCalldata(target, big.NewInt(0), []byte{})
 	sig := make([]byte, 65)
 	return map[string]any{
@@ -101,6 +112,8 @@ func validUserOp() map[string]any {
 		"preVerificationGas":   "0xc350",
 		"maxFeePerGas":         "0xba43b7400",
 		"maxPriorityFeePerGas": "0x3b9aca00",
+		"paymaster":            testPaymaster.Hex(),
+		"paymasterData":        "0x",
 		"signature":            core.BytesToHex(sig),
 	}
 }
@@ -149,16 +162,29 @@ func TestSendUserOperationBadSignatureLength(t *testing.T) {
 	}
 }
 
-func TestSendUserOperationForbiddenTarget(t *testing.T) {
+func TestSendUserOperationNoPaymaster(t *testing.T) {
 	srv, _ := setupServer(t)
 	op := validUserOp()
-	forbidden := common.HexToAddress("0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead")
-	calldata := core.BuildExecuteCalldata(forbidden, big.NewInt(0), []byte{})
-	op["callData"] = core.BytesToHex(calldata)
+	delete(op, "paymaster")
+	delete(op, "paymasterData")
 	resp := rpcCall(t, srv, "eth_sendUserOperation", op, testEntryPoint.Hex())
 
 	if resp.Error == nil {
-		t.Fatal("expected error for forbidden target")
+		t.Fatal("expected error for missing paymaster")
+	}
+	if resp.Error.Code != -32521 {
+		t.Errorf("error code = %d, want -32521", resp.Error.Code)
+	}
+}
+
+func TestSendUserOperationForbiddenPaymaster(t *testing.T) {
+	srv, _ := setupServer(t)
+	op := validUserOp()
+	op["paymaster"] = common.HexToAddress("0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead").Hex()
+	resp := rpcCall(t, srv, "eth_sendUserOperation", op, testEntryPoint.Hex())
+
+	if resp.Error == nil {
+		t.Fatal("expected error for forbidden paymaster")
 	}
 	if resp.Error.Code != -32521 {
 		t.Errorf("error code = %d, want -32521", resp.Error.Code)
@@ -300,6 +326,54 @@ func TestChainId(t *testing.T) {
 
 	if chainId != "0x1" {
 		t.Errorf("chainId = %s, want 0x1", chainId)
+	}
+}
+
+func TestGetPaymasterStubData(t *testing.T) {
+	srv, _ := setupServer(t)
+	op := validUserOp()
+	resp := rpcCall(t, srv, "pm_getPaymasterStubData", op, testEntryPoint.Hex(), "0x1", nil)
+
+	if resp.Error != nil {
+		t.Fatalf("error: %v", resp.Error)
+	}
+
+	b, _ := json.Marshal(resp.Result)
+	var result map[string]string
+	json.Unmarshal(b, &result)
+
+	if result["paymaster"] == "" {
+		t.Error("paymaster missing")
+	}
+	if result["paymasterData"] == "" {
+		t.Error("paymasterData missing")
+	}
+	if result["paymasterVerificationGasLimit"] == "" {
+		t.Error("paymasterVerificationGasLimit missing")
+	}
+	if result["paymasterPostOpGasLimit"] == "" {
+		t.Error("paymasterPostOpGasLimit missing")
+	}
+}
+
+func TestGetPaymasterData(t *testing.T) {
+	srv, _ := setupServer(t)
+	op := validUserOp()
+	resp := rpcCall(t, srv, "pm_getPaymasterData", op, testEntryPoint.Hex(), "0x1", nil)
+
+	if resp.Error != nil {
+		t.Fatalf("error: %v", resp.Error)
+	}
+
+	b, _ := json.Marshal(resp.Result)
+	var result map[string]string
+	json.Unmarshal(b, &result)
+
+	if result["paymaster"] == "" {
+		t.Error("paymaster missing")
+	}
+	if result["paymasterData"] == "" || result["paymasterData"] == "0x" {
+		t.Error("paymasterData should be non-empty")
 	}
 }
 

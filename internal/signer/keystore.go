@@ -2,6 +2,7 @@ package signer
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"go.uber.org/zap"
 )
@@ -166,9 +168,28 @@ func (s *BundlerSigner) SignAndSubmit(ctx context.Context, to common.Address, da
 	return txHash, nil
 }
 
+// SignHash signs a 32-byte hash with the bundler's private key, returning
+// a 65-byte signature (r(32) + s(32) + v(1)) with Ethereum's personal_sign
+// prefix already applied by the caller if needed.
+func (s *BundlerSigner) SignHash(hash []byte) ([]byte, error) {
+	return ethSign(hash, s.key.PrivateKey)
+}
+
 func isNonceTooLow(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "nonce too low") || strings.Contains(msg, "already known")
+}
+
+// ethSign signs a 32-byte hash with an ECDSA key, returning a 65-byte
+// signature with v = 27 or 28 (Ethereum convention).
+func ethSign(hash []byte, key *ecdsa.PrivateKey) ([]byte, error) {
+	sig, err := crypto.Sign(hash, key)
+	if err != nil {
+		return nil, err
+	}
+	// crypto.Sign returns v=0/1; Ethereum uses v=27/28.
+	sig[64] += 27
+	return sig, nil
 }
 
 func weiToEthString(wei *big.Int) string {

@@ -15,8 +15,8 @@ entryPoints = [
   "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 ]
 
-allowedTargets = [
-  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+allowedPaymasters = [
+  "0x1111111111111111111111111111111111111111"
 ]
 
 maxVerificationGas = 50000
@@ -37,8 +37,8 @@ maxCallGas         = 500000
 	if len(cfg.EntryPoints) != 1 {
 		t.Fatalf("entryPoints len = %d", len(cfg.EntryPoints))
 	}
-	if len(cfg.AllowedTargets) != 1 {
-		t.Errorf("allowedTargets len = %d", len(cfg.AllowedTargets))
+	if len(cfg.AllowedPaymasters) != 1 {
+		t.Errorf("allowedPaymasters len = %d", len(cfg.AllowedPaymasters))
 	}
 
 	// Defaults
@@ -59,10 +59,26 @@ maxCallGas         = 500000
 	}
 }
 
+func TestLoadMissingPaymasters(t *testing.T) {
+	content := `
+rpcUrl = "http://localhost:8545"
+chainId = 1
+entryPoints = ["0x0000000071727De22E5E9d8BAf0edAc6f37da032"]
+maxVerificationGas = 50000
+maxCallGas = 500000
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Error("expected error for missing allowedPaymasters")
+	}
+}
+
 func TestLoadMissingRpcURL(t *testing.T) {
 	content := `
 chainId = 1
 entryPoints = ["0x0000000071727De22E5E9d8BAf0edAc6f37da032"]
+allowedPaymasters = ["0x1111111111111111111111111111111111111111"]
 maxVerificationGas = 50000
 maxCallGas = 500000
 `
@@ -77,6 +93,7 @@ func TestLoadMissingChainID(t *testing.T) {
 	content := `
 rpcUrl = "http://localhost:8545"
 entryPoints = ["0x0000000071727De22E5E9d8BAf0edAc6f37da032"]
+allowedPaymasters = ["0x1111111111111111111111111111111111111111"]
 maxVerificationGas = 50000
 maxCallGas = 500000
 `
@@ -91,6 +108,7 @@ func TestLoadMissingEntryPoints(t *testing.T) {
 	content := `
 rpcUrl = "http://localhost:8545"
 chainId = 1
+allowedPaymasters = ["0x1111111111111111111111111111111111111111"]
 maxVerificationGas = 50000
 maxCallGas = 500000
 `
@@ -109,6 +127,7 @@ entryPoints = [
   "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
   "0x1111111111111111111111111111111111111111"
 ]
+allowedPaymasters = ["0x2222222222222222222222222222222222222222"]
 maxVerificationGas = 50000
 maxCallGas = 500000
 `

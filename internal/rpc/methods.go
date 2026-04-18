@@ -9,6 +9,7 @@ import (
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
 	"github.com/oleary-labs/signet-min-bundler/internal/estimator"
 	"github.com/oleary-labs/signet-min-bundler/internal/mempool"
+	"github.com/oleary-labs/signet-min-bundler/internal/paymaster"
 	"github.com/oleary-labs/signet-min-bundler/internal/validator"
 	"go.uber.org/zap"
 )
@@ -16,9 +17,10 @@ import (
 // Methods holds the dependencies for JSON-RPC method handlers.
 type Methods struct {
 	cfg       MethodsConfig
-	validator *validator.AllowlistValidator
+	validator *validator.Validator
 	repo      mempool.Repository
 	estimator *estimator.Estimator
+	paymaster *paymaster.Service
 	log       *zap.Logger
 }
 
@@ -31,9 +33,10 @@ type MethodsConfig struct {
 // NewMethods creates a Methods handler.
 func NewMethods(
 	cfg MethodsConfig,
-	v *validator.AllowlistValidator,
+	v *validator.Validator,
 	repo mempool.Repository,
 	est *estimator.Estimator,
+	pm *paymaster.Service,
 	log *zap.Logger,
 ) *Methods {
 	return &Methods{
@@ -41,6 +44,7 @@ func NewMethods(
 		validator: v,
 		repo:      repo,
 		estimator: est,
+		paymaster: pm,
 		log:       log,
 	}
 }
@@ -218,6 +222,68 @@ func (m *Methods) isAllowedEntryPoint(addr common.Address) bool {
 		}
 	}
 	return false
+}
+
+func (m *Methods) handleGetPaymasterStubData(params []json.RawMessage) (any, *RpcError) {
+	op, rpcErr := m.parsePaymasterRequest(params)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	result := m.paymaster.GetStubData(op)
+	return sponsorResultToRPC(result), nil
+}
+
+func (m *Methods) handleGetPaymasterData(params []json.RawMessage) (any, *RpcError) {
+	op, rpcErr := m.parsePaymasterRequest(params)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	result, err := m.paymaster.GetPaymasterData(op)
+	if err != nil {
+		return nil, ErrOpRejected("paymaster signing failed: " + err.Error())
+	}
+	return sponsorResultToRPC(result), nil
+}
+
+// parsePaymasterRequest extracts the PackedUserOp from pm_ RPC params.
+// Params: [userOp, entryPoint, chainId, context]
+func (m *Methods) parsePaymasterRequest(params []json.RawMessage) (*core.PackedUserOp, *RpcError) {
+	if len(params) < 2 {
+		return nil, ErrInvalidParams("expected [userOp, entryPoint, chainId, context]")
+	}
+
+	var op core.UserOperationRPC
+	if err := json.Unmarshal(params[0], &op); err != nil {
+		return nil, ErrInvalidParams("invalid userOp: " + err.Error())
+	}
+
+	var entryPointHex string
+	if err := json.Unmarshal(params[1], &entryPointHex); err != nil {
+		return nil, ErrInvalidParams("invalid entryPoint: " + err.Error())
+	}
+
+	entryPoint := common.HexToAddress(entryPointHex)
+	if !m.isAllowedEntryPoint(entryPoint) {
+		return nil, ErrOpRejected("unsupported entry point")
+	}
+
+	packed, err := core.FromRPC(op)
+	if err != nil {
+		return nil, ErrInvalidParams(err.Error())
+	}
+
+	return packed, nil
+}
+
+func sponsorResultToRPC(r *paymaster.SponsorResult) map[string]string {
+	return map[string]string{
+		"paymaster":                     r.Paymaster.Hex(),
+		"paymasterData":                 core.BytesToHex(r.PaymasterData),
+		"paymasterVerificationGasLimit": core.BigToHex(new(big.Int).SetUint64(r.PaymasterVerificationGasLimit)),
+		"paymasterPostOpGasLimit":       core.BigToHex(new(big.Int).SetUint64(r.PaymasterPostOpGasLimit)),
+	}
 }
 
 // storedOpToRPC converts a StoredOp back to the wire format with metadata.
