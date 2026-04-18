@@ -73,7 +73,7 @@ func (s *Server) dispatch(r *http.Request, req *jsonrpcRequest) (any, *RpcError)
 	case "pm_getPaymasterStubData":
 		return s.methods.handleGetPaymasterStubData(req.Params)
 	case "pm_getPaymasterData":
-		return s.methods.handleGetPaymasterData(req.Params)
+		return s.methods.handleGetPaymasterData(r.Context(), req.Params)
 	default:
 		return nil, ErrMethodNotFound("method not found: " + req.Method)
 	}

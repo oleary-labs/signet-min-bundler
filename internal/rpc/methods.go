@@ -234,15 +234,15 @@ func (m *Methods) handleGetPaymasterStubData(params []json.RawMessage) (any, *Rp
 	return sponsorResultToRPC(result), nil
 }
 
-func (m *Methods) handleGetPaymasterData(params []json.RawMessage) (any, *RpcError) {
+func (m *Methods) handleGetPaymasterData(ctx context.Context, params []json.RawMessage) (any, *RpcError) {
 	op, rpcErr := m.parsePaymasterRequest(params)
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
 
-	result, err := m.paymaster.GetPaymasterData(op)
+	result, err := m.paymaster.GetPaymasterData(ctx, op)
 	if err != nil {
-		return nil, ErrOpRejected("paymaster signing failed: " + err.Error())
+		return nil, ErrOpRejected(err.Error())
 	}
 	return sponsorResultToRPC(result), nil
 }

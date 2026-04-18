@@ -42,6 +42,15 @@ func (s *mockPaymasterSigner) SignHash(hash []byte) ([]byte, error) {
 	return make([]byte, 65), nil
 }
 
+type mockPaymasterCaller struct{}
+
+func (c *mockPaymasterCaller) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	// Return abi-encoded true (shouldSponsor always returns true in tests).
+	result := make([]byte, 32)
+	result[31] = 1
+	return result, nil
+}
+
 func setupServer(t *testing.T) (*Server, mempool.Repository) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.db")
@@ -58,7 +67,7 @@ func setupServer(t *testing.T) (*Server, mempool.Repository) {
 	)
 
 	est := estimator.New(&mockEstClient{})
-	pm := paymaster.New(&mockPaymasterSigner{}, testPaymaster, 1)
+	pm := paymaster.New(&mockPaymasterSigner{}, &mockPaymasterCaller{}, testPaymaster, 1)
 
 	methods := NewMethods(
 		MethodsConfig{

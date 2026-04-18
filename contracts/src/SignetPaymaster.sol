@@ -83,6 +83,19 @@ contract SignetPaymaster is BasePaymaster {
         signature = paymasterAndData[SIGNATURE_OFFSET:];
     }
 
+    // ── Off-chain sponsorship check ───────────────────────────────────
+
+    /// @notice Called off-chain by the bundler (via eth_call) before signing
+    ///         paymaster data. Returns true if this op should be sponsored.
+    ///         Allows app-specific policy without full EVM simulation.
+    /// @dev    TODO: Add policy checks. Candidates:
+    ///         - For group calls: verify sender is owner/operator of the group
+    ///         - For factory calls: whitelist or rate-limit account creation
+    ///         Currently returns true for any op that passes target validation.
+    function shouldSponsor(PackedUserOperation calldata userOp) external view returns (bool) {
+        return _isAllowedTarget(userOp.getSender(), userOp.callData);
+    }
+
     // ── Validation ──────────────────────────────────────────────────────
 
     function _validatePaymasterUserOp(

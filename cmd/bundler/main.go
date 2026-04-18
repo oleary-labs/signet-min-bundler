@@ -122,7 +122,7 @@ func run(configPath string) error {
 
 	est := estimator.New(client)
 
-	pm := paymaster.New(bSigner, cfg.AllowedPaymasters[0], cfg.ChainID)
+	pm := paymaster.New(bSigner, client, cfg.AllowedPaymasters[0], cfg.ChainID)
 
 	methods := rpc.NewMethods(
 		rpc.MethodsConfig{

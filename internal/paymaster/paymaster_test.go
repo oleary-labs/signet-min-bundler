@@ -1,9 +1,11 @@
 package paymaster
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
 )
@@ -20,9 +22,21 @@ func (s *mockSigner) SignHash(hash []byte) ([]byte, error) {
 	return sig, nil
 }
 
+type mockCaller struct {
+	shouldSponsor bool
+}
+
+func (c *mockCaller) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	result := make([]byte, 32)
+	if c.shouldSponsor {
+		result[31] = 1
+	}
+	return result, nil
+}
+
 var (
-	signerAddr     = common.HexToAddress("0x1111111111111111111111111111111111111111")
-	paymasterAddr  = common.HexToAddress("0x2222222222222222222222222222222222222222")
+	signerAddr    = common.HexToAddress("0x1111111111111111111111111111111111111111")
+	paymasterAddr = common.HexToAddress("0x2222222222222222222222222222222222222222")
 )
 
 func testOp() *core.PackedUserOp {
@@ -38,7 +52,7 @@ func testOp() *core.PackedUserOp {
 }
 
 func TestGetStubData(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, paymasterAddr, 1)
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, paymasterAddr, 1)
 	result := svc.GetStubData(testOp())
 
 	if result.Paymaster != paymasterAddr {
@@ -61,8 +75,8 @@ func TestGetStubData(t *testing.T) {
 }
 
 func TestGetPaymasterData(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, paymasterAddr, 1)
-	result, err := svc.GetPaymasterData(testOp())
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, paymasterAddr, 1)
+	result, err := svc.GetPaymasterData(context.Background(), testOp())
 	if err != nil {
 		t.Fatalf("GetPaymasterData: %v", err)
 	}
@@ -79,8 +93,16 @@ func TestGetPaymasterData(t *testing.T) {
 	}
 }
 
+func TestGetPaymasterDataRejected(t *testing.T) {
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: false}, paymasterAddr, 1)
+	_, err := svc.GetPaymasterData(context.Background(), testOp())
+	if err == nil {
+		t.Fatal("expected error when shouldSponsor returns false")
+	}
+}
+
 func TestGetHashDeterministic(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, paymasterAddr, 1)
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, paymasterAddr, 1)
 	op := testOp()
 
 	h1 := svc.getHash(op, 1000, 500)
