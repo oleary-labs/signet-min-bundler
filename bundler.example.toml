@@ -35,3 +35,11 @@ dbPath = "~/.bundler/bundler.db"
 # ── Server ────────────────────────────────────────────────────────────────
 listenAddr     = ":4337"
 tickIntervalMs = 12_000       # 12 seconds (one Ethereum block)
+
+# ── ZK Proof API (optional) ──────────────────────────────────────────────
+# Path to the compiled jwt_auth circuit from signet-protocol.
+# If set, enables POST /v1/prove for server-side ZK proof generation.
+# circuitDir = "../signet-protocol/circuits/jwt_auth"
+
+# API key for the prover endpoint. If empty, no auth is required.
+# proverApiKey = "your-secret-key"

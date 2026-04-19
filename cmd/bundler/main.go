@@ -31,6 +31,7 @@ import (
 	"github.com/oleary-labs/signet-min-bundler/internal/estimator"
 	"github.com/oleary-labs/signet-min-bundler/internal/mempool"
 	"github.com/oleary-labs/signet-min-bundler/internal/paymaster"
+	"github.com/oleary-labs/signet-min-bundler/internal/prover"
 	"github.com/oleary-labs/signet-min-bundler/internal/rpc"
 	"github.com/oleary-labs/signet-min-bundler/internal/signer"
 	"github.com/oleary-labs/signet-min-bundler/internal/validator"
@@ -156,10 +157,31 @@ func run(configPath string) error {
 		log.With(zap.String("component", "pruner")),
 	)
 
-	// 10. Start everything.
+	// 10. Build HTTP handler with path-based routing.
+	var proverHandler http.Handler
+	if cfg.CircuitDir != "" {
+		circuitDir := config.ExpandPath(cfg.CircuitDir)
+		proverSvc, err := prover.New(circuitDir, log.With(zap.String("component", "prover")))
+		if err != nil {
+			log.Warn("prover disabled", zap.String("reason", err.Error()))
+		} else {
+			proverHandler = proverSvc.Handler(cfg.ProverAPIKey)
+			log.Info("prover API enabled", zap.String("path", "/v1/prove"))
+		}
+	}
+
+	rpcHandler := rpcServer.Handler()
+	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/prove" && proverHandler != nil {
+			proverHandler.ServeHTTP(w, r)
+			return
+		}
+		rpcHandler.ServeHTTP(w, r)
+	})
+
 	httpServer := &http.Server{
 		Addr:    cfg.ListenAddr,
-		Handler: rpcServer.Handler(),
+		Handler: httpHandler,
 	}
 
 	go func() {

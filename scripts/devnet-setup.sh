@@ -222,7 +222,7 @@ chainId = $ANVIL_CHAIN_ID
 
 entryPoints = ["$ENTRYPOINT_V07"]
 
-# VerifyingPaymaster deployed by devnet-setup.sh.
+# SignetPaymaster deployed by devnet-setup.sh.
 # Bundler key is the verifying signer — signs all sponsorship requests.
 allowedPaymasters = ["$PAYMASTER_ADDR"]
 
@@ -238,6 +238,10 @@ listenAddr   = ":4337"
 tickIntervalMs = 2000
 pendingTtlMs   = 1800000
 retentionMs    = 604800000
+
+# ZK proof API — uses jwt_auth circuit from signet-protocol.
+circuitDir  = "../signet-protocol/circuits/jwt_auth"
+proverApiKey = "devnet-insecure"
 EOF
 
 ok "Config written to $CONFIG_PATH"

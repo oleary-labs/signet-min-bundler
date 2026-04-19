@@ -25,6 +25,8 @@ type BundlerConfig struct {
 	DbPath             string           `toml:"dbPath"`
 	ListenAddr         string           `toml:"listenAddr"`
 	TickIntervalMs     int64            `toml:"tickIntervalMs"`
+	CircuitDir         string           `toml:"circuitDir"`
+	ProverAPIKey       string           `toml:"proverApiKey"`
 }
 
 // Load reads and validates a BundlerConfig from a TOML file.
