@@ -27,6 +27,7 @@ type BundlerConfig struct {
 	TickIntervalMs     int64            `toml:"tickIntervalMs"`
 	CircuitDir         string           `toml:"circuitDir"`
 	ProverAPIKey       string           `toml:"proverApiKey"`
+	SponsorGating      bool             `toml:"sponsorGating"`
 }
 
 // Load reads and validates a BundlerConfig from a TOML file.

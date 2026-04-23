@@ -43,3 +43,9 @@ tickIntervalMs = 12_000       # 12 seconds (one Ethereum block)
 
 # API key for the prover endpoint. If empty, no auth is required.
 # proverApiKey = "your-secret-key"
+
+# ── Sponsor gating (optional) ────────────────────────────────────────────
+# When true, only whitelisted senders get paymaster sponsorship.
+# New senders can redeem an invite code via the ERC-7677 context field.
+# Generate codes: go run ./cmd/invite --db <dbPath> --count N
+# sponsorGating = true

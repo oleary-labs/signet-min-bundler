@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/oleary-labs/signet-min-bundler/internal/core"
+	"github.com/oleary-labs/signet-min-bundler/internal/sponsor"
 )
 
 // DefaultValidityWindow is how long a paymaster sponsorship is valid.
@@ -35,15 +36,17 @@ type EthCaller interface {
 type Service struct {
 	signer           PaymasterSigner
 	client           EthCaller
+	sponsor          *sponsor.Store
 	paymasterAddress common.Address
 	chainID          uint64
 }
 
-// New creates a paymaster Service.
-func New(signer PaymasterSigner, client EthCaller, paymasterAddress common.Address, chainID uint64) *Service {
+// New creates a paymaster Service. sponsor may be nil to disable invite-code gating.
+func New(signer PaymasterSigner, client EthCaller, sponsor *sponsor.Store, paymasterAddress common.Address, chainID uint64) *Service {
 	return &Service{
 		signer:           signer,
 		client:           client,
+		sponsor:          sponsor,
 		paymasterAddress: paymasterAddress,
 		chainID:          chainID,
 	}
@@ -73,9 +76,19 @@ func (s *Service) GetStubData(op *core.PackedUserOp) *SponsorResult {
 	}
 }
 
+// SponsorContext holds optional fields from the ERC-7677 context parameter.
+type SponsorContext struct {
+	InviteCode string `json:"invite_code,omitempty"`
+}
+
 // GetPaymasterData returns signed paymaster data for submission.
-// Calls the on-chain shouldSponsor check before signing.
-func (s *Service) GetPaymasterData(ctx context.Context, op *core.PackedUserOp) (*SponsorResult, error) {
+// Checks the sender whitelist (and optional invite code) before signing.
+func (s *Service) GetPaymasterData(ctx context.Context, op *core.PackedUserOp, sc *SponsorContext) (*SponsorResult, error) {
+	// Check invite-code / whitelist gating.
+	if err := s.checkSponsorAccess(op.Sender, sc); err != nil {
+		return nil, err
+	}
+
 	// Check on-chain sponsorship policy before signing.
 	if err := s.checkShouldSponsor(ctx, op); err != nil {
 		return nil, err
@@ -154,6 +167,29 @@ func encodeValidityAndSig(validUntil, validAfter uint64, sig []byte) []byte {
 	copy(encoded[32:64], core.PadLeft32(new(big.Int).SetUint64(validAfter).Bytes()))
 	copy(encoded[64:], sig)
 	return encoded
+}
+
+// checkSponsorAccess verifies that the sender is whitelisted or has a valid invite code.
+// If no sponsor store is configured, all senders are allowed.
+func (s *Service) checkSponsorAccess(sender common.Address, sc *SponsorContext) error {
+	if s.sponsor == nil {
+		return nil // no gating configured
+	}
+
+	// Already whitelisted.
+	if s.sponsor.CheckSender(sender) {
+		return nil
+	}
+
+	// Try to redeem an invite code.
+	if sc != nil && sc.InviteCode != "" {
+		if err := s.sponsor.RedeemCode(sc.InviteCode, sender); err != nil {
+			return fmt.Errorf("invite code rejected: %w", err)
+		}
+		return nil // newly whitelisted
+	}
+
+	return fmt.Errorf("sender %s not whitelisted — provide an invite code", sender.Hex())
 }
 
 // shouldSponsorSelector is the selector for shouldSponsor(PackedUserOperation).

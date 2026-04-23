@@ -67,7 +67,7 @@ func setupServer(t *testing.T) (*Server, mempool.Repository) {
 	)
 
 	est := estimator.New(&mockEstClient{})
-	pm := paymaster.New(&mockPaymasterSigner{}, &mockPaymasterCaller{}, testPaymaster, 1)
+	pm := paymaster.New(&mockPaymasterSigner{}, &mockPaymasterCaller{}, nil, testPaymaster, 1)
 
 	methods := NewMethods(
 		MethodsConfig{

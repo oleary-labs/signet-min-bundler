@@ -240,7 +240,13 @@ func (m *Methods) handleGetPaymasterData(ctx context.Context, params []json.RawM
 		return nil, rpcErr
 	}
 
-	result, err := m.paymaster.GetPaymasterData(ctx, op)
+	// Parse optional context (4th param) for invite code, etc.
+	var sc paymaster.SponsorContext
+	if len(params) >= 4 {
+		json.Unmarshal(params[3], &sc) // best-effort; ignore errors
+	}
+
+	result, err := m.paymaster.GetPaymasterData(ctx, op, &sc)
 	if err != nil {
 		return nil, ErrOpRejected(err.Error())
 	}

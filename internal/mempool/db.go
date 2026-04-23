@@ -53,6 +53,9 @@ type SQLiteRepo struct {
 	log *zap.Logger
 }
 
+// DB returns the underlying *sql.DB for sharing with other packages.
+func (r *SQLiteRepo) DB() *sql.DB { return r.db }
+
 // Open creates or opens a SQLite database at path and applies the schema.
 func Open(path string, log *zap.Logger) (*SQLiteRepo, error) {
 	db, err := sql.Open("sqlite", path)

@@ -52,7 +52,7 @@ func testOp() *core.PackedUserOp {
 }
 
 func TestGetStubData(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, paymasterAddr, 1)
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, nil, paymasterAddr, 1)
 	result := svc.GetStubData(testOp())
 
 	if result.Paymaster != paymasterAddr {
@@ -75,8 +75,8 @@ func TestGetStubData(t *testing.T) {
 }
 
 func TestGetPaymasterData(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, paymasterAddr, 1)
-	result, err := svc.GetPaymasterData(context.Background(), testOp())
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, nil, paymasterAddr, 1)
+	result, err := svc.GetPaymasterData(context.Background(), testOp(), nil)
 	if err != nil {
 		t.Fatalf("GetPaymasterData: %v", err)
 	}
@@ -94,15 +94,15 @@ func TestGetPaymasterData(t *testing.T) {
 }
 
 func TestGetPaymasterDataRejected(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: false}, paymasterAddr, 1)
-	_, err := svc.GetPaymasterData(context.Background(), testOp())
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: false}, nil, paymasterAddr, 1)
+	_, err := svc.GetPaymasterData(context.Background(), testOp(), nil)
 	if err == nil {
 		t.Fatal("expected error when shouldSponsor returns false")
 	}
 }
 
 func TestGetHashDeterministic(t *testing.T) {
-	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, paymasterAddr, 1)
+	svc := New(&mockSigner{addr: signerAddr}, &mockCaller{shouldSponsor: true}, nil, paymasterAddr, 1)
 	op := testOp()
 
 	h1 := svc.getHash(op, 1000, 500)

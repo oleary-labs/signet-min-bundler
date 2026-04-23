@@ -34,6 +34,7 @@ import (
 	"github.com/oleary-labs/signet-min-bundler/internal/prover"
 	"github.com/oleary-labs/signet-min-bundler/internal/rpc"
 	"github.com/oleary-labs/signet-min-bundler/internal/signer"
+	"github.com/oleary-labs/signet-min-bundler/internal/sponsor"
 	"github.com/oleary-labs/signet-min-bundler/internal/validator"
 )
 
@@ -123,7 +124,17 @@ func run(configPath string) error {
 
 	est := estimator.New(client)
 
-	pm := paymaster.New(bSigner, client, cfg.AllowedPaymasters[0], cfg.ChainID)
+	// Sponsor store for invite-code gating (opt-in).
+	var sponsorStore *sponsor.Store
+	if cfg.SponsorGating {
+		sponsorStore, err = sponsor.Open(repo.DB())
+		if err != nil {
+			return fmt.Errorf("init sponsor store: %w", err)
+		}
+		log.Info("sponsor gating enabled (invite codes required)")
+	}
+
+	pm := paymaster.New(bSigner, client, sponsorStore, cfg.AllowedPaymasters[0], cfg.ChainID)
 
 	methods := rpc.NewMethods(
 		rpc.MethodsConfig{
