@@ -32,9 +32,8 @@ RUN NARGO_VERSION=$(cat /tmp/nargo_version) && \
 RUN BB_VERSION=$(cat /tmp/bb_version) && \
     ARCH=$(uname -m) && \
     if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then ARCH="arm64"; else ARCH="amd64"; fi && \
-    mkdir -p /root/.bb && \
     curl -sL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${BB_VERSION}/barretenberg-${ARCH}-linux.tar.gz" \
-    | tar -xzC /root/.bb
+    | tar -xzC /usr/local/bin
 
 # ---- Final runtime image ----
 FROM debian:bookworm-slim
@@ -44,8 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy nargo + bb from the tools stage.
 COPY --from=tools /usr/local/bin/nargo /usr/local/bin/nargo
-COPY --from=tools /root/.bb /root/.bb
-ENV PATH="/root/.bb:${PATH}"
+COPY --from=tools /usr/local/bin/bb /usr/local/bin/bb
 
 COPY --from=build /app/bundler /app/bundler
 COPY bundler.docker.toml /app/bundler.toml
