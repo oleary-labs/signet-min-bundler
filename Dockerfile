@@ -36,7 +36,8 @@ RUN BB_VERSION=$(cat /tmp/bb_version) && \
     | tar -xzC /usr/local/bin
 
 # ---- Final runtime image ----
-FROM debian:bookworm-slim
+# bb 3.0+ requires GLIBC 2.38+ — bookworm only has 2.36.
+FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libstdc++6 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
