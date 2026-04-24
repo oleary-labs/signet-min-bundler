@@ -170,15 +170,13 @@ func run(configPath string) error {
 
 	// 10. Build HTTP handler with path-based routing.
 	var proverHandler http.Handler
-	if cfg.CircuitDir != "" {
-		circuitDir := config.ExpandPath(cfg.CircuitDir)
-		proverSvc, err := prover.New(circuitDir, log.With(zap.String("component", "prover")))
-		if err != nil {
-			log.Warn("prover disabled", zap.String("reason", err.Error()))
-		} else {
-			proverHandler = proverSvc.Handler(cfg.ProverAPIKey)
-			log.Info("prover API enabled", zap.String("path", "/v1/prove"))
-		}
+	proverSvc, err := prover.New(log.With(zap.String("component", "prover")))
+	if err != nil {
+		log.Warn("prover disabled", zap.String("reason", err.Error()))
+	} else {
+		defer proverSvc.Close()
+		proverHandler = proverSvc.Handler(cfg.ProverAPIKey)
+		log.Info("prover API enabled", zap.String("path", "/v1/prove"))
 	}
 
 	rpcHandler := rpcServer.Handler()

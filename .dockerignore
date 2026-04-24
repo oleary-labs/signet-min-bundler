@@ -1,0 +1,33 @@
+# Git
+.git
+.gitmodules
+
+# Devnet local state
+.devnet/
+bin/
+
+# Forge / Solidity
+lib/
+contracts/out/
+contracts/cache/
+contracts/foundry.lock
+out/
+cache/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Runtime data
+*.db
+*.db-wal
+*.db-shm
+keystore.json
+bundler.toml
+
+# Test artifacts
+*.test
+coverage.out

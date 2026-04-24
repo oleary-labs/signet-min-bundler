@@ -96,27 +96,20 @@ The prover requires two external tools:
 
 Both are looked up on `PATH` first, then at their default install locations (`~/.nargo/bin/nargo` and `~/.bb/bb`).
 
-The prover also requires a **pre-compiled circuit** — the `jwt_auth` circuit from the [signet-protocol](https://github.com/oleary-labs/signet-protocol) repository. The compiled artifact (`target/jwt_auth.json`) must exist at the configured `circuitDir`. To compile it:
+Circuit artifacts (ACIR bytecode, Noir source, and Nargo.toml) are embedded from the [signet-circuits](https://github.com/oleary-labs/signet-circuits) Go module. No local circuit checkout is needed — the bundler extracts them to a temp directory at startup.
 
-```bash
-cd ../signet-protocol/circuits/jwt_auth
-nargo compile
-```
+The bundler also verifies that the installed `nargo` and `bb` versions match the toolchain metadata embedded in the circuit module. A mismatch logs a warning and disables the prover.
 
 ## Configuration
 
 Add to `bundler.toml`:
 
 ```toml
-# Path to the jwt_auth circuit directory (must contain target/jwt_auth.json).
-# If omitted, the prover API is disabled.
-circuitDir = "../signet-protocol/circuits/jwt_auth"
-
 # API key for the /v1/prove endpoint. If empty, no auth is required.
 proverApiKey = "your-secret-key"
 ```
 
-The prover is **opt-in** — if `circuitDir` is not set, the endpoint is not registered and the bundler operates as a pure ERC-4337 bundler.
+The prover is enabled automatically when `nargo` and `bb` are on PATH and match the expected versions. If they are missing or mismatched, the bundler logs a warning and operates as a pure ERC-4337 bundler.
 
 ## Limitations
 

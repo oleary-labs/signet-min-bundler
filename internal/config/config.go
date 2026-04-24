@@ -25,7 +25,6 @@ type BundlerConfig struct {
 	DbPath             string           `toml:"dbPath"`
 	ListenAddr         string           `toml:"listenAddr"`
 	TickIntervalMs     int64            `toml:"tickIntervalMs"`
-	CircuitDir         string           `toml:"circuitDir"`
 	ProverAPIKey       string           `toml:"proverApiKey"`
 	SponsorGating      bool             `toml:"sponsorGating"`
 }

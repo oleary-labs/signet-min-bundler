@@ -239,8 +239,7 @@ tickIntervalMs = 2000
 pendingTtlMs   = 1800000
 retentionMs    = 604800000
 
-# ZK proof API — uses jwt_auth circuit from signet-protocol.
-circuitDir  = "../signet-protocol/circuits/jwt_auth"
+# ZK proof API — circuit is embedded from signet-circuits Go module.
 proverApiKey = "devnet-insecure"
 EOF
 

@@ -2,8 +2,9 @@
 // authentication. It takes a raw JWT + session public key and produces an
 // UltraHonk proof that the JWT is valid without revealing its contents.
 //
-// Requires `nargo` and `bb` (Barretenberg) on PATH and a pre-compiled
-// circuit directory (the jwt_auth circuit from signet-protocol).
+// Circuit artifacts are embedded via the signet-circuits Go module —
+// no local circuit checkout is needed. Requires `nargo` and `bb`
+// (Barretenberg) on PATH.
 package prover
 
 import (
@@ -19,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	circuits "github.com/oleary-labs/signet-circuits/packages/go"
 	"go.uber.org/zap"
 )
 
@@ -30,21 +32,15 @@ const BoundedVecMaxLen = 128
 
 // Service generates ZK proofs for JWT authentication.
 type Service struct {
-	circuitDir string
+	circuitDir string // temp directory with extracted circuit files
 	nargoPath  string
 	bbPath     string
 	log        *zap.Logger
 }
 
-// New creates a prover Service.
-// circuitDir is the path to the compiled jwt_auth circuit (must contain target/jwt_auth.json).
-func New(circuitDir string, log *zap.Logger) (*Service, error) {
-	// Verify circuit artifacts exist.
-	circuitJSON := filepath.Join(circuitDir, "target", "jwt_auth.json")
-	if _, err := os.Stat(circuitJSON); err != nil {
-		return nil, fmt.Errorf("compiled circuit not found at %s: %w", circuitJSON, err)
-	}
-
+// New creates a prover Service. Circuit artifacts are extracted from the
+// embedded signet-circuits Go module into a temporary directory.
+func New(log *zap.Logger) (*Service, error) {
 	// Resolve nargo and bb paths.
 	nargoPath, err := findBin("nargo", "~/.nargo/bin/nargo")
 	if err != nil {
@@ -55,12 +51,67 @@ func New(circuitDir string, log *zap.Logger) (*Service, error) {
 		return nil, err
 	}
 
+	// Assert installed toolchain matches embedded circuit metadata.
+	if err := circuits.AssertToolchain(); err != nil {
+		return nil, fmt.Errorf("toolchain check: %w", err)
+	}
+
+	// Extract embedded circuit files to a temp directory.
+	circuitDir, err := extractCircuit()
+	if err != nil {
+		return nil, fmt.Errorf("extract circuit: %w", err)
+	}
+
+	log.Info("circuit extracted from signet-circuits module",
+		zap.String("dir", circuitDir))
+
 	return &Service{
 		circuitDir: circuitDir,
 		nargoPath:  nargoPath,
 		bbPath:     bbPath,
 		log:        log,
 	}, nil
+}
+
+// extractCircuit writes the embedded circuit source and compiled artifacts
+// to a temp directory structured for nargo execute + bb prove.
+func extractCircuit() (string, error) {
+	dir, err := os.MkdirTemp("", "signet-circuit-*")
+	if err != nil {
+		return "", err
+	}
+
+	// Nargo.toml (project root)
+	if err := os.WriteFile(filepath.Join(dir, "Nargo.toml"), circuits.JWTNargoToml, 0644); err != nil {
+		return "", err
+	}
+
+	// src/main.nr
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "main.nr"), circuits.JWTMainNr, 0644); err != nil {
+		return "", err
+	}
+
+	// target/jwt_auth.json (compiled ACIR)
+	targetDir := filepath.Join(dir, "target")
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "jwt_auth.json"), circuits.JWTCircuit, 0644); err != nil {
+		return "", err
+	}
+
+	return dir, nil
+}
+
+// Close removes the temporary circuit directory.
+func (s *Service) Close() {
+	if s.circuitDir != "" {
+		os.RemoveAll(s.circuitDir)
+	}
 }
 
 // ProveRequest is the input to the proof generation API.
