@@ -39,7 +39,7 @@ RUN BB_VERSION=$(cat /tmp/bb_version) && \
 # ---- Final runtime image ----
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libstdc++6 libgomp1 git \
+    ca-certificates libstdc++6 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy nargo + bb from the tools stage.
@@ -48,6 +48,8 @@ COPY --from=tools /root/.bb /root/.bb
 ENV PATH="/root/.bb:${PATH}"
 
 COPY --from=build /app/bundler /app/bundler
+COPY bundler.docker.toml /app/bundler.toml
+COPY scripts/docker-entrypoint.sh /app/entrypoint.sh
 
 WORKDIR /app
-CMD ["/app/bundler"]
+ENTRYPOINT ["/app/entrypoint.sh"]

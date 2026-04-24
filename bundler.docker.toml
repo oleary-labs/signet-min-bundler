@@ -1,0 +1,36 @@
+# bundler.docker.toml — default config baked into the Docker image.
+# Secrets are injected via env vars: BUNDLER_RPC_URL, BUNDLER_PROVER_API_KEY,
+# BUNDLER_KEYSTORE_PASSWORD.
+
+# ── Network (Sepolia) ─────────────��──────────────────────────────────────
+rpcUrl  = "https://rpc.sepolia.org"  # overridden by BUNDLER_RPC_URL
+chainId = 11155111
+
+# ── Protocol ─────────���─────────────────────────────��──────────────────────
+entryPoints = [
+  "0x0000000071727De22E5E9d8BAf0edAc6f37da032",  # EntryPoint v0.7
+]
+
+allowedPaymasters = [
+  "0xA320eAC9e1BEBb9F6477d7AC56ddf7dA82Ae3Aec",  # SignetPaymaster (Sepolia)
+]
+
+# ── Gas bounds ──────────────────��──────────────────────────────��──────────
+maxVerificationGas = 1000000
+maxCallGas         = 5000000
+maxBundleSize      = 10
+
+# ── Mempool lifecycle ──────���──────────────────────────────────────────────
+pendingTtlMs = 1_800_000     # 30 minutes
+retentionMs  = 604_800_000   # 7 days
+
+# ── Paths (Railway volume at /data) ───────���───────────────────────────────
+keystorePath = "/data/keystore.json"
+dbPath       = "/data/bundler.db"
+
+# ── Server ──────────��──────────────────────────────────��──────────────────
+listenAddr     = ":4337"
+tickIntervalMs = 12_000
+
+# ── ZK Proof API ─────────────────────────────────────────���────────────────
+# proverApiKey is set via BUNDLER_PROVER_API_KEY env var.
