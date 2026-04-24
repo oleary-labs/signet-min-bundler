@@ -42,6 +42,7 @@ func Load(path string) (*BundlerConfig, error) {
 	}
 
 	cfg.applyDefaults()
+	cfg.applyEnvOverrides()
 
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("config validation: %w", err)
@@ -71,6 +72,18 @@ func (c *BundlerConfig) applyDefaults() {
 	}
 	if c.KeystorePath == "" {
 		c.KeystorePath = "~/.bundler/keystore.json"
+	}
+}
+
+// applyEnvOverrides lets sensitive fields be injected via environment variables,
+// overriding whatever is in the TOML file. This is the recommended approach for
+// secrets in containerized deployments (e.g. Railway).
+func (c *BundlerConfig) applyEnvOverrides() {
+	if v := os.Getenv("BUNDLER_RPC_URL"); v != "" {
+		c.RpcURL = v
+	}
+	if v := os.Getenv("BUNDLER_PROVER_API_KEY"); v != "" {
+		c.ProverAPIKey = v
 	}
 }
 

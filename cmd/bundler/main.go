@@ -10,6 +10,8 @@
 //	BUNDLER_CONFIG             Path to bundler.toml (default: ./bundler.toml)
 //	BUNDLER_LOG_LEVEL          debug|info|warn|error (default: info)
 //	BUNDLER_DEV                Set to 1 for human-readable log output
+//	BUNDLER_RPC_URL            Override rpcUrl from config (for injecting secrets)
+//	BUNDLER_PROVER_API_KEY     Override proverApiKey from config
 package main
 
 import (
