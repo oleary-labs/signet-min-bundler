@@ -12,7 +12,7 @@ entryPoints = [
 ]
 
 allowedPaymasters = [
-  "0xA320eAC9e1BEBb9F6477d7AC56ddf7dA82Ae3Aec",  # SignetPaymaster (Sepolia)
+  "0x6A1af9c28FCD54304D43428A7bE3f154c0237197",  # SignetPaymaster (Sepolia)
 ]
 
 # ── Gas bounds ──────────────────��──────────────────────────────��──────────
