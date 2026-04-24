@@ -1,0 +1,9 @@
+ VERIFYING_SIGNER=0xceafeda2644380e1ac67e5de41465ea7d7904a88 \
+  DEPLOY_SALT=0x0000000000000000000000000000000000000000000000000000000000000001 \
+  forge script DeployPaymaster \
+    --rpc-url $SEPOLIA_RPC_URL \
+    --private-key $DEPLOYER_KEY \
+    --broadcast \
+    --root contracts
+
+Sepolia paymaster: 0xA320eAC9e1BEBb9F6477d7AC56ddf7dA82Ae3Aec
