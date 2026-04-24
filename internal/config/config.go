@@ -56,7 +56,7 @@ func (c *BundlerConfig) applyDefaults() {
 		c.MaxBundleSize = 10
 	}
 	if c.PendingTtlMs == 0 {
-		c.PendingTtlMs = 1_800_000 // 30 minutes
+		c.PendingTtlMs = 600_000 // 10 minutes
 	}
 	if c.RetentionMs == 0 {
 		c.RetentionMs = 604_800_000 // 7 days

@@ -21,7 +21,7 @@ maxCallGas         = 5000000
 maxBundleSize      = 10
 
 # ── Mempool lifecycle ──────���──────────────────────────────────────────────
-pendingTtlMs = 1_800_000     # 30 minutes
+pendingTtlMs = 600_000       # 10 minutes (matches paymaster validity window)
 retentionMs  = 604_800_000   # 7 days
 
 # ── Paths (Railway volume at /data) ───────���───────────────────────────────
