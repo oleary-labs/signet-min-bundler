@@ -49,6 +49,7 @@ ENV PATH="/root/.bb:${PATH}"
 
 COPY --from=build /app/bundler /app/bundler
 COPY bundler.docker.toml /app/bundler.toml
+COPY scripts/docker-entrypoint.sh /app/entrypoint.sh
 
 WORKDIR /app
-CMD ["/app/bundler"]
+ENTRYPOINT ["/app/entrypoint.sh"]
