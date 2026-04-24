@@ -51,7 +51,7 @@ maxCallGas         = 500000
 	if cfg.TickIntervalMs != 12_000 {
 		t.Errorf("tickIntervalMs default = %d, want 12000", cfg.TickIntervalMs)
 	}
-	if cfg.PendingTtlMs != 1_800_000 {
+	if cfg.PendingTtlMs != 600_000 {
 		t.Errorf("pendingTtlMs default = %d", cfg.PendingTtlMs)
 	}
 	if cfg.RetentionMs != 604_800_000 {

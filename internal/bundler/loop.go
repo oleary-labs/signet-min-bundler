@@ -235,6 +235,12 @@ func isEntryPointRevert(estimateErr error, revertReason string) bool {
 		return true
 	}
 
+	// Any execution revert from the EntryPoint is permanent — expired
+	// paymaster signatures, invalid ops, etc. won't succeed on retry.
+	if strings.Contains(msg, "execution reverted") {
+		return true
+	}
+
 	return false
 }
 
