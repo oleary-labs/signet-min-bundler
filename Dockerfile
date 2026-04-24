@@ -48,6 +48,7 @@ COPY --from=tools /root/.bb /root/.bb
 ENV PATH="/root/.bb:${PATH}"
 
 COPY --from=build /app/bundler /app/bundler
+COPY bundler.docker.toml /app/bundler.toml
 
 WORKDIR /app
 CMD ["/app/bundler"]

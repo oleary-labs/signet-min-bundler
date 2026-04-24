@@ -33,4 +33,5 @@ out/
 cache/
 contracts/out/
 contracts/cache/
+contracts/broadcast/
 contracts/foundry.lock
