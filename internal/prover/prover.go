@@ -253,16 +253,10 @@ func (s *Service) Prove(req *ProveRequest) (*ProveResult, error) {
 	}
 
 	// 7. Read proof bytes.
-	// bb prove outputs the combined format: [4-byte BE field count][public inputs][proof].
-	// The node expects just the proof portion — it reconstructs public inputs itself.
-	// Strip the 4-byte header and public inputs to match the bb.js format.
-	fullProof, err := os.ReadFile(filepath.Join(s.circuitDir, "target", proofDir, "proof"))
+	// bb 3.0+ outputs the raw proof without a public inputs prefix.
+	proofBytes, err := os.ReadFile(filepath.Join(s.circuitDir, "target", proofDir, "proof"))
 	if err != nil {
 		return nil, fmt.Errorf("read proof: %w", err)
-	}
-	proofBytes, err := stripPublicInputs(fullProof)
-	if err != nil {
-		return nil, fmt.Errorf("strip public inputs: %w", err)
 	}
 
 	return &ProveResult{
@@ -317,25 +311,6 @@ func findBin(name, fallback string) (string, error) {
 	return "", fmt.Errorf("%s not found on PATH or at %s", name, fallback)
 }
 
-// totalPIElements is the number of public input field elements in the circuit.
-// Must match the circuit's public input declaration:
-//   18 modulus limbs + 4×(128 storage + 1 len) + 1 exp + 33 session_pub = 568
-const totalPIElements = 568
-const fieldElementSize = 32
-
-// stripPublicInputs removes the 4-byte size header and public inputs from
-// the bb prove output, returning just the proof portion. This matches the
-// format returned by bb.js's generateProof (proof only, no public inputs).
-func stripPublicInputs(fullProof []byte) ([]byte, error) {
-	piBytes := totalPIElements * fieldElementSize // 568 × 32 = 18176
-	headerSize := 4
-	offset := headerSize + piBytes
-	if len(fullProof) <= offset {
-		return nil, fmt.Errorf("proof file too small: %d bytes, expected > %d", len(fullProof), offset)
-	}
-	return fullProof[offset:], nil
-}
-
 // cleanupRequest removes per-request files from the circuit directory.
 func (s *Service) cleanupRequest(reqID, proverName, witnessName, proofDir string) {
 	os.Remove(filepath.Join(s.circuitDir, proverName+".toml"))
@@ -375,7 +350,7 @@ func writeProverToml(path string, d proverData) error {
 	b.WriteString(fmt.Sprintf("redc_params_limbs = [%s]\n", joinQuoted(d.RedcLimbs)))
 	b.WriteString(fmt.Sprintf("signature_limbs = [%s]\n", joinQuoted(d.SigLimbs)))
 	b.WriteString(fmt.Sprintf("pubkey_modulus_limbs = [%s]\n", joinQuoted(d.ModulusLimbs)))
-	b.WriteString(fmt.Sprintf("session_pub = [%s]\n\n", joinInts(d.SessionPub)))
+	b.WriteString(fmt.Sprintf("_session_pub = [%s]\n\n", joinInts(d.SessionPub)))
 
 	b.WriteString("[data]\n")
 	b.WriteString(fmt.Sprintf("storage = [%s]\n", joinInts(d.DataStorage)))
