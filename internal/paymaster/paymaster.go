@@ -154,9 +154,10 @@ func (s *Service) paymasterGasLimits() []byte {
 }
 
 // validityWindow returns (validUntil, validAfter) timestamps.
+// validAfter is set 60 seconds in the past to account for block timestamp lag.
 func (s *Service) validityWindow() (uint64, uint64) {
 	now := uint64(time.Now().Unix())
-	return now + uint64(DefaultValidityWindow.Seconds()), now
+	return now + uint64(DefaultValidityWindow.Seconds()), now - 60
 }
 
 // encodeValidityAndSig builds paymasterData = abi.encode(validUntil, validAfter) + signature.
