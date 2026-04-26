@@ -133,6 +133,7 @@ func (l *BundlingLoop) Tick(ctx context.Context) error {
 			l.failOps(ops, revertReason)
 			l.log.Error("ops failed permanently",
 				zap.String("reason", revertReason),
+				zap.String("estimate_error", err.Error()),
 				zap.Int("count", len(ops)))
 		} else {
 			// Network errors, RPC timeouts, etc. are transient — retry later.
