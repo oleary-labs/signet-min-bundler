@@ -192,7 +192,7 @@ func run(configPath string) error {
 
 	httpServer := &http.Server{
 		Addr:    cfg.ListenAddr,
-		Handler: httpHandler,
+		Handler: recoverMiddleware(httpHandler, log),
 	}
 
 	go func() {
@@ -241,4 +241,20 @@ func buildLogger() (*zap.Logger, error) {
 	}
 
 	return cfg.Build()
+}
+
+// recoverMiddleware catches panics in HTTP handlers and returns a 500
+// instead of crashing the process.
+func recoverMiddleware(next http.Handler, log *zap.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if v := recover(); v != nil {
+				log.Error("handler panic",
+					zap.Any("error", v),
+					zap.String("path", r.URL.Path))
+				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
