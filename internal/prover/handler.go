@@ -46,8 +46,12 @@ func (s *Service) Handler(apiKey string) http.Handler {
 			return
 		}
 
+		pubPreview := req.SessionPub
+		if len(pubPreview) > 16 {
+			pubPreview = pubPreview[:16] + "..."
+		}
 		s.log.Info("prove request received",
-			zap.String("session_pub", req.SessionPub[:16]+"..."))
+			zap.String("session_pub", pubPreview))
 
 		start := time.Now()
 		result, err := s.Prove(&ProveRequest{

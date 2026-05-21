@@ -15,7 +15,7 @@ import "../src/SignetPaymaster.sol";
 ///
 /// Optional env vars:
 ///   ENTRY_POINT        — EntryPoint address (default: v0.7 @ 0x0000000071727De22E5E9d8BAf0edAc6f37da032)
-///   FACTORY            — SignetAccountFactory address (default: 0xB4c55139db4ad9c481DAA82B249F934CBbB73b91)
+///   FACTORY            — SignetAccountFactory address (default: 0xb5236214c7C7e421779682748B30478Ade8Fa93D)
 ///
 /// Usage:
 ///   forge script DeployPaymaster \
@@ -25,7 +25,7 @@ import "../src/SignetPaymaster.sol";
 ///     --root contracts
 contract DeployPaymaster is Script {
     address constant ENTRYPOINT_V07 = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
-    address constant SIGNET_FACTORY = 0xB4c55139db4ad9c481DAA82B249F934CBbB73b91;
+    address constant SIGNET_FACTORY = 0xb5236214c7C7e421779682748B30478Ade8Fa93D;
 
     function run() external {
         address entryPoint = vm.envOr("ENTRY_POINT", ENTRYPOINT_V07);
