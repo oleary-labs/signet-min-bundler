@@ -7,3 +7,15 @@
     --root contracts
 
 Sepolia paymaster: 0xA320eAC9e1BEBb9F6477d7AC56ddf7dA82Ae3Aec
+
+cast send 0x6A1af9c28FCD54304D43428A7bE3f154c0237197 \
+    "setFactory(address)" \
+    0xb5236214c7C7e421779682748B30478Ade8Fa93D \
+    --rpc-url $SEPOLIA_RPC_URL \
+    --private-key $DEPLOYER_PK
+
+forge script DeployPaymaster \
+    --rpc-url $SEPOLIA_RPC_URL \
+    --private-key $DEPLOYER_PK \
+    --broadcast \
+    --root contracts
