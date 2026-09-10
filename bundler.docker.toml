@@ -1,36 +1,54 @@
 # bundler.docker.toml — default config baked into the Docker image.
 # Secrets are injected via env vars: BUNDLER_RPC_URL, BUNDLER_PROVER_API_KEY,
-# BUNDLER_KEYSTORE_PASSWORD.
+# BUNDLER_KEYSTORE_PASSWORD, BUNDLER_KEYSTORE_B64.
 
-# ── Network (Sepolia) ─────────────��──────────────────────────────────────
-rpcUrl  = "https://rpc.sepolia.org"  # overridden by BUNDLER_RPC_URL
-chainId = 11155111
+# ── Network (Ethereum mainnet) ────────────────────────────────────────────
+rpcUrl  = "https://ethereum-rpc.publicnode.com"  # overridden by BUNDLER_RPC_URL
+chainId = 1
 
-# ── Protocol ─────────���─────────────────────────────��──────────────────────
+# ── Protocol ──────────────────────────────────────────────────────────────
 entryPoints = [
   "0x0000000071727De22E5E9d8BAf0edAc6f37da032",  # EntryPoint v0.7
 ]
 
+# SignetPaymaster (mainnet). CREATE2 address for:
+#   entryPoint      0x0000000071727De22E5E9d8BAf0edAc6f37da032
+#   verifyingSigner 0x9c695d25496fd38f1652F831e386db37098d532B  (bundler hot key)
+#   factory         0x86eb99d569aad51c3160c5c50ec3093e6771c07a  (SignetFactory proxy)
+#   owner           0x180E9a320BD5bD59375191571bB9C1Ca8825515A  (Signet admin key)
+#   salt            0x00..01
+# Changing any of those changes the address — re-run the deploy script to predict.
 allowedPaymasters = [
-  "0x50Cc2c0afa48269A628B4D245f0Bc76b8cCdfB23",  # SignetPaymaster (Sepolia)
+  "0xB128EDF40d8279dcf2fb16C996F7b2753Db63bd8",
 ]
 
-# ── Gas bounds ──────────────────��──────────────────────────────��──────────
+# ── Gas bounds ────────────────────────────────────────────────────────────
 maxVerificationGas = 1000000
 maxCallGas         = 5000000
 maxBundleSize      = 10
 
-# ── Mempool lifecycle ──────���──────────────────────────────────────────────
+# ── Mempool lifecycle ─────────────────────────────────────────────────────
 pendingTtlMs = 600_000       # 10 minutes (matches paymaster validity window)
 retentionMs  = 604_800_000   # 7 days
 
-# ── Paths (Railway volume at /data) ───────���───────────────────────────────
+# ── Paths (Railway volume at /data) ───────────────────────────────────────
 keystorePath = "/data/keystore.json"
 dbPath       = "/data/bundler.db"
 
-# ── Server ──────────��──────────────────────────────────��──────────────────
+# Verified against the keystore on startup — a wrong or swapped keystore fails
+# fast instead of signing sponsorships the paymaster will reject.
+expectedAddress = "0x9c695d25496fd38f1652F831e386db37098d532B"
+
+# ── Server ────────────────────────────────────────────────────────────────
 listenAddr     = ":4337"
 tickIntervalMs = 12_000
 
-# ── ZK Proof API ─────────────────────────────────────────���────────────────
+# ── Sponsor gating ────────────────────────────────────────────────────────
+# Only whitelisted senders get paymaster sponsorship. New senders redeem a
+# single-use invite code via the ERC-7677 context field, which whitelists them
+# permanently. Codes live in the SQLite DB on the /data volume — mint them with:
+#   /app/invite --db /data/bundler.db --count N
+sponsorGating = true
+
+# ── ZK Proof API ──────────────────────────────────────────────────────────
 # proverApiKey is set via BUNDLER_PROVER_API_KEY env var.
