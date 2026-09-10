@@ -5,6 +5,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /app/bundler ./cmd/bundler
+# invite generates sponsor-gating codes against the live SQLite DB on the
+# /data volume, so it has to ship in the image — there is no other way to
+# reach that DB once deployed.
+RUN CGO_ENABLED=0 go build -o /app/invite ./cmd/invite
 
 # Extract nargo and bb versions from the signet-circuits metadata so the
 # tools stage installs exactly the versions the embedded artifacts expect.
@@ -47,8 +51,14 @@ COPY --from=tools /usr/local/bin/nargo /usr/local/bin/nargo
 COPY --from=tools /usr/local/bin/bb /usr/local/bin/bb
 
 COPY --from=build /app/bundler /app/bundler
+COPY --from=build /app/invite /app/invite
 COPY bundler.docker.toml /app/bundler.toml
 COPY scripts/docker-entrypoint.sh /app/entrypoint.sh
 
 WORKDIR /app
+
+# Railway reads EXPOSE to pick the service's target port for both the public
+# proxy and the /healthz healthcheck.
+EXPOSE 4337
+
 ENTRYPOINT ["/app/entrypoint.sh"]

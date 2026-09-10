@@ -183,11 +183,15 @@ func run(configPath string) error {
 
 	rpcHandler := rpcServer.Handler()
 	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/prove" && proverHandler != nil {
+		switch {
+		case r.URL.Path == "/healthz":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"ok":true}`))
+		case r.URL.Path == "/v1/prove" && proverHandler != nil:
 			proverHandler.ServeHTTP(w, r)
-			return
+		default:
+			rpcHandler.ServeHTTP(w, r)
 		}
-		rpcHandler.ServeHTTP(w, r)
 	})
 
 	httpServer := &http.Server{

@@ -35,13 +35,22 @@ contract SignetPaymaster is BasePaymaster {
 
     event FactoryUpdated(address indexed oldFactory, address indexed newFactory);
 
+    /// @param _owner Address that receives ownership. Must be passed explicitly:
+    ///        BasePaymaster's `Ownable(msg.sender)` would otherwise make the
+    ///        CREATE2 deployer proxy (0x4e59...4956C) the owner when deployed
+    ///        deterministically, permanently burning ownership along with any
+    ///        EntryPoint deposit and the ability to call setFactory.
     constructor(
         IEntryPoint _entryPoint,
         address _verifyingSigner,
-        ISignetFactory _factory
+        ISignetFactory _factory,
+        address _owner
     ) BasePaymaster(_entryPoint) {
+        require(_verifyingSigner != address(0), "SignetPaymaster: signer is zero");
+        require(_owner != address(0), "SignetPaymaster: owner is zero");
         verifyingSigner = _verifyingSigner;
         factory = _factory;
+        _transferOwnership(_owner);
     }
 
     /// @notice Update the factory address. Only callable by the owner.

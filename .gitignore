@@ -35,3 +35,7 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 contracts/foundry.lock
+
+# Railway IaC: the CLI regenerates railway.ts on some commands. This repo
+# authors the Go variant (.railway/railway.go); two files break `config plan`.
+.railway/railway.ts
