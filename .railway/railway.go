@@ -17,6 +17,10 @@ func Railway(ctx railway.Context) railway.Project {
 	})
 
 	signetMinBundler := railway.ServiceNamed("signet-min-bundler", railway.ServiceConfig{
+		"source": railway.Github("oleary-labs/signet-min-bundler", map[string]any{
+			"branch": "main",
+		}),
+
 		"healthcheck":        "/healthz",
 		"healthcheckTimeout": 300,
 
