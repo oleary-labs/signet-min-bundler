@@ -11,7 +11,8 @@
 //	BUNDLER_LOG_LEVEL          debug|info|warn|error (default: info)
 //	BUNDLER_DEV                Set to 1 for human-readable log output
 //	BUNDLER_RPC_URL            Override rpcUrl from config (for injecting secrets)
-//	BUNDLER_PROVER_API_KEY     Override proverApiKey from config
+//	BUNDLER_PROVER_API_KEY     Override proverApiKey: the X-API-Key required on every
+//	                           endpoint except /healthz (name predates the JSON-RPC check)
 package main
 
 import (
@@ -181,7 +182,13 @@ func run(configPath string) error {
 		log.Info("prover API enabled", zap.String("path", "/v1/prove"))
 	}
 
-	rpcHandler := rpcServer.Handler()
+	// One shared key guards the JSON-RPC path (including the ERC-7677 pm_
+	// methods that spend the paymaster deposit) as well as /v1/prove, which
+	// checks it itself. /healthz stays open for Railway's probe.
+	rpcHandler := rpc.RequireAPIKey(cfg.ProverAPIKey, rpcServer.Handler())
+	if cfg.ProverAPIKey == "" {
+		log.Warn("no API key configured: JSON-RPC and paymaster endpoints are unauthenticated")
+	}
 	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/healthz":

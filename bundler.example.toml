@@ -40,7 +40,9 @@ tickIntervalMs = 12_000       # 12 seconds (one Ethereum block)
 # Circuit artifacts are embedded from the signet-circuits Go module.
 # The prover is enabled automatically when nargo and bb are on PATH.
 
-# API key for the prover endpoint. If empty, no auth is required.
+# X-API-Key required on every endpoint except /healthz: JSON-RPC (including
+# the ERC-7677 pm_ methods that spend the paymaster deposit) and /v1/prove.
+# The name predates the JSON-RPC check. If empty, no auth is required.
 # proverApiKey = "your-secret-key"
 
 # ── Sponsor gating (optional) ────────────────────────────────────────────

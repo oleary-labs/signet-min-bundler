@@ -68,6 +68,8 @@ Configuration is loaded from a TOML file. No secrets are stored in config.
 | `dbPath` | `~/.bundler/bundler.db` | SQLite database path |
 | `listenAddr` | `:4337` | HTTP listen address |
 | `tickIntervalMs` | `12000` | Bundling loop interval (12s) |
+| `proverApiKey` | *(empty)* | `X-API-Key` required on every endpoint except `/healthz`. Empty disables auth. |
+| `sponsorGating` | `false` | Require an invite code (ERC-7677 `context.invite_code`) before sponsoring a new sender |
 
 ### Environment variables
 
@@ -77,6 +79,8 @@ Configuration is loaded from a TOML file. No secrets are stored in config.
 | `BUNDLER_CONFIG` | Path to `bundler.toml` (default: `./bundler.toml`) |
 | `BUNDLER_LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` (default: `info`) |
 | `BUNDLER_DEV` | Set to `1` for human-readable log output |
+| `BUNDLER_RPC_URL` | Override `rpcUrl` |
+| `BUNDLER_PROVER_API_KEY` | Override `proverApiKey` |
 
 ## JSON-RPC methods
 
@@ -88,6 +92,10 @@ Configuration is loaded from a TOML file. No secrets are stored in config.
 | `eth_getUserOperationReceipt(hash)` | Returns receipt once confirmed, or `null`. |
 | `eth_supportedEntryPoints()` | Returns configured entry point addresses. |
 | `eth_chainId()` | Returns chain ID as hex string. |
+| `pm_getPaymasterStubData(op, entryPoint, chainId, context)` | ERC-7677 stub paymaster fields for gas estimation. |
+| `pm_getPaymasterData(op, entryPoint, chainId, context)` | ERC-7677 signed paymaster fields. Spends the paymaster deposit. |
+
+When `proverApiKey` is set, every method requires an `X-API-Key` header. `GET /healthz` is always open.
 
 ## Architecture
 
