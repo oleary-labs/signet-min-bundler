@@ -26,6 +26,7 @@ go build -o send-userop .
 |------|---------|-------------|
 | `--rpc` | `http://localhost:8545` | Ethereum JSON-RPC URL |
 | `--bundler` | *(required)* | ERC-4337 bundler JSON-RPC URL |
+| `--api-key` | `$BUNDLER_API_KEY` | `X-API-Key` sent to the bundler only. Required when the bundler sets `proverApiKey`. |
 | `--entry-point` | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` | EntryPoint v0.7 address |
 | `--factory` | — | `SignetAccountFactory` address; derives sender and builds `initCode` automatically |
 | `--salt` | `0` | CREATE2 salt passed to the factory (decimal or `0x` hex) |

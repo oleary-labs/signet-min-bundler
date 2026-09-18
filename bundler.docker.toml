@@ -44,11 +44,13 @@ listenAddr     = ":4337"
 tickIntervalMs = 12_000
 
 # ── Sponsor gating ────────────────────────────────────────────────────────
-# Only whitelisted senders get paymaster sponsorship. New senders redeem a
-# single-use invite code via the ERC-7677 context field, which whitelists them
-# permanently. Codes live in the SQLite DB on the /data volume — mint them with:
-#   /app/invite --db /data/bundler.db --count N
-sponsorGating = true
+# Off: signet-platform decides who gets sponsored (org invites plus
+# SPONSOR_GROUP_CREATION), and it never sends an ERC-7677 invite_code, so
+# bundler-side gating would reject every platform request. The API key below
+# keeps anyone else from asking. To gate here instead, set true and mint codes
+# with: /app/invite --db /data/bundler.db --count N
+sponsorGating = false
 
-# ── ZK Proof API ──────────────────────────────────────────────────────────
-# proverApiKey is set via BUNDLER_PROVER_API_KEY env var.
+# ── API key ───────────────────────────────────────────────────────────────
+# proverApiKey is set via BUNDLER_PROVER_API_KEY env var and is required as
+# X-API-Key on every endpoint except /healthz.

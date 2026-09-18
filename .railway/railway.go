@@ -45,6 +45,12 @@ func Railway(ctx railway.Context) railway.Project {
 			"BUNDLER_PROVER_API_KEY":    railway.Preserve(),
 			"BUNDLER_RPC_URL":           railway.Preserve(),
 			"BUNDLER_LOG_LEVEL":         "info",
+
+			// Tells Railway which port to route healthchecks and private
+			// traffic to. The bundler itself ignores PORT — it takes its
+			// listen address from listenAddr in bundler.docker.toml — so this
+			// exists purely so Railway probes 4337 instead of its default.
+			"PORT": "4337",
 		},
 	})
 

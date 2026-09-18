@@ -83,6 +83,7 @@ func run() error {
 	var (
 		rpcURL             = flag.String("rpc", "http://localhost:8545", "Ethereum JSON-RPC URL")
 		bundlerURL         = flag.String("bundler", "", "ERC-4337 bundler JSON-RPC URL (required)")
+		bundlerAPIKey      = flag.String("api-key", os.Getenv("BUNDLER_API_KEY"), "X-API-Key sent to the bundler only (default $BUNDLER_API_KEY)")
 		entryPointStr      = flag.String("entry-point", "0x0000000071727De22E5E9d8BAf0edAc6f37da032", "EntryPoint v0.7 address")
 		factoryStr         = flag.String("factory", "", "SignetAccountFactory address; when set, initCode is built automatically")
 		saltStr            = flag.String("salt", "0", "CREATE2 salt passed to the factory (decimal or 0x hex)")
@@ -264,7 +265,7 @@ func run() error {
 
 	// Estimate gas via the bundler before computing the hash (gas limits are part of the hash).
 	if !*noEstimateGas {
-		est, err := fetchGasEstimate(ctx, *bundlerURL, op, entryPoint)
+		est, err := fetchGasEstimate(ctx, *bundlerURL, *bundlerAPIKey, op, entryPoint)
 		if err != nil {
 			fmt.Printf("gas estimate: failed (%v) — using flag values\n", err)
 		} else {
@@ -300,7 +301,7 @@ func run() error {
 	}
 
 	fmt.Printf("submitting to  %s...\n", *bundlerURL)
-	resultHash, err := submitToBundler(ctx, *bundlerURL, op, entryPoint)
+	resultHash, err := submitToBundler(ctx, *bundlerURL, *bundlerAPIKey, op, entryPoint)
 	if err != nil {
 		return fmt.Errorf("submit: %w", err)
 	}
@@ -787,7 +788,7 @@ type gasEstimate struct {
 // fetchGasEstimate calls eth_estimateUserOperationGas on the bundler.
 // It sends the op with an empty dummy signature (65 zero bytes) so the bundler
 // can simulate without requiring a valid FROST signature.
-func fetchGasEstimate(ctx context.Context, bundlerURL string, op *packedUserOp, entryPoint [20]byte) (*gasEstimate, error) {
+func fetchGasEstimate(ctx context.Context, bundlerURL, apiKey string, op *packedUserOp, entryPoint [20]byte) (*gasEstimate, error) {
 	maxPriorityFeePerGas := new(big.Int).SetBytes(op.GasFees[0:16])
 	maxFeePerGas := new(big.Int).SetBytes(op.GasFees[16:32])
 
@@ -810,7 +811,7 @@ func fetchGasEstimate(ctx context.Context, bundlerURL string, op *packedUserOp, 
 	}
 
 	params := []any{userOpJSON, "0x" + hex.EncodeToString(entryPoint[:])}
-	result, err := rpc(ctx, bundlerURL, "eth_estimateUserOperationGas", params)
+	result, err := rpcWithKey(ctx, bundlerURL, apiKey, "eth_estimateUserOperationGas", params)
 	if err != nil {
 		return nil, err
 	}
@@ -913,7 +914,7 @@ func parseBigHex(s string) (*big.Int, error) {
 //	accountGasLimits → verificationGasLimit (hi 128) + callGasLimit (lo 128)
 //	gasFees          → maxPriorityFeePerGas (hi 128) + maxFeePerGas (lo 128)
 //	initCode         → factory (20 bytes) + factoryData (remainder)
-func submitToBundler(ctx context.Context, bundlerURL string, op *packedUserOp, entryPoint [20]byte) (string, error) {
+func submitToBundler(ctx context.Context, bundlerURL, apiKey string, op *packedUserOp, entryPoint [20]byte) (string, error) {
 	verificationGasLimit := new(big.Int).SetBytes(op.AccountGasLimits[0:16])
 	callGasLimit := new(big.Int).SetBytes(op.AccountGasLimits[16:32])
 	maxPriorityFeePerGas := new(big.Int).SetBytes(op.GasFees[0:16])
@@ -938,7 +939,7 @@ func submitToBundler(ctx context.Context, bundlerURL string, op *packedUserOp, e
 	}
 
 	params := []any{userOpJSON, "0x" + hex.EncodeToString(entryPoint[:])}
-	result, err := rpc(ctx, bundlerURL, "eth_sendUserOperation", params)
+	result, err := rpcWithKey(ctx, bundlerURL, apiKey, "eth_sendUserOperation", params)
 	if err != nil {
 		return "", err
 	}
@@ -952,6 +953,12 @@ func submitToBundler(ctx context.Context, bundlerURL string, op *packedUserOp, e
 // rpc makes a JSON-RPC call and returns the raw result field, or an error if
 // the server returned a JSON-RPC error object.
 func rpc(ctx context.Context, url, method string, params []any) (json.RawMessage, error) {
+	return rpcWithKey(ctx, url, "", method, params)
+}
+
+// rpcWithKey is rpc with an X-API-Key header when apiKey is non-empty. Use it
+// for bundler calls only — never send the key to the Ethereum RPC provider.
+func rpcWithKey(ctx context.Context, url, apiKey, method string, params []any) (json.RawMessage, error) {
 	if params == nil {
 		params = []any{}
 	}
@@ -970,6 +977,9 @@ func rpc(ctx context.Context, url, method string, params []any) (json.RawMessage
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
